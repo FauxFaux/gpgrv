@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::u32;
 
 use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
@@ -49,7 +50,11 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<()> {
         other => bail!("not supported: packet tag: {}, len: {}", other, len),
     };
 
-    ensure!(0 == from.limit(), "parser bug: failed to read {} trailing bytes", from.limit());
+    ensure!(
+        0 == from.limit(),
+        "parser bug: failed to read {} trailing bytes",
+        from.limit()
+    );
 
     parsed
 }
@@ -93,6 +98,22 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
     let good_subpackets = read_u16_prefixed_data(&mut from)?;
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
+    for (id, data) in parse_subpackets(&bad_subpackets)? {
+        if is_bit_set(id, 7) {
+            bail!("unsupported critical subpacket: {}", id);
+        }
+
+        match id {
+            16 => {
+                use hex::ToHex;
+                println!("issuer: {}", data.to_hex());
+            }
+            _ => {
+                // SHOULD ignore non-critical
+            }
+        }
+    }
+
     let hash_hint = from.read_u16::<BigEndian>();
 
     match key_alg {
@@ -106,6 +127,37 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
     }
 
     Ok(())
+}
+
+// https://tools.ietf.org/html/rfc4880#section-5.2.3.1
+fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>> {
+    if data.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut ret = Vec::with_capacity(data.len() / 4);
+
+    while !data.is_empty() {
+        let len = usize::from(data[0]);
+        ensure!(len < 192, "not supported [laziness]: long sub packets");
+        ensure!(len != 0, "illegal empty subpacket");
+
+        // data starts after the length (currently always 1 byte) and the id (one byte)
+        let data_start = 1 + 1;
+
+        // `len` includes the id byte, but not the stored length; so take the id byte off
+        let data_end = data_start + len - 1;
+
+        ensure!(data.len() >= data_start, "illegal super-short subpacket");
+        ensure!(data_end <= data.len(), "packet extends outside field");
+
+        let id = data[1];
+        ret.push((id, &data[data_start..data_end]));
+
+        data = &data[data_end..];
+    }
+
+    Ok(ret)
 }
 
 fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>> {
