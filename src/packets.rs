@@ -132,7 +132,10 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     } )
 }
 
+// https://tools.ietf.org/html/rfc4880#section-5.2.4.1
 fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
+    let mut issuer = None;
+
     for (id, data) in parse_subpackets(&subpackets)? {
         if is_bit_set(id, 7) {
             bail!("unsupported critical subpacket: {}", id);
@@ -144,8 +147,7 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
                 let mut array_sadness = [0u8; 8];
                 array_sadness.copy_from_slice(data);
 
-                // TODO: accepting the first value?
-                return Ok(Some(array_sadness));
+                issuer = Some(array_sadness);
             }
             _ => {
                 // SHOULD ignore non-critical
@@ -153,7 +155,7 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
         }
     }
 
-    return Ok(None);
+    return Ok(issuer);
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.3.1
