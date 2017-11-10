@@ -9,8 +9,13 @@ use usize_from;
 use usize_from_u32;
 
 enum PublicKeyAlg {
-    RSA,
-    DSA,
+    Rsa,
+    Dsa,
+}
+
+enum PublicKeySig {
+    Rsa(Vec<u8>),
+    Dsa { r: Vec<u8>, s: Vec<u8> },
 }
 
 enum HashAlg {
@@ -19,7 +24,13 @@ enum HashAlg {
     Sha512,
 }
 
-pub fn parse_packet<R: Read>(mut from: R) -> Result<()> {
+pub struct Signature {
+    pub issuer: Option<[u8; 8]>,
+    authenticated_data: Vec<u8>,
+    sig: PublicKeySig,
+}
+
+pub fn parse_packet<R: Read>(mut from: R) -> Result<Signature> {
     let val = from.read_u8()?;
     ensure!(is_bit_set(val, 7), "invalid packet tag");
     let tag;
@@ -59,7 +70,7 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<()> {
     parsed
 }
 
-fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
+fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     {
         // https://tools.ietf.org/html/rfc4880#section-5.2.3
         match from.read_u8()? {
@@ -82,8 +93,8 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
 
     // https://tools.ietf.org/html/rfc4880#section-9.1
     let key_alg = match from.read_u8()? {
-        1 | 3 => PublicKeyAlg::RSA,
-        17 => PublicKeyAlg::DSA,
+        1 | 3 => PublicKeyAlg::Rsa,
+        17 => PublicKeyAlg::Dsa,
         other => bail!("not supported: key algorithm: {}", other),
     };
 
@@ -98,15 +109,43 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
     let good_subpackets = read_u16_prefixed_data(&mut from)?;
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
-    for (id, data) in parse_subpackets(&bad_subpackets)? {
+    let issuer = find_issuer(&bad_subpackets)?;
+
+    let hash_hint = from.read_u16::<BigEndian>();
+
+    let sig = match key_alg {
+        PublicKeyAlg::Rsa => {
+            PublicKeySig::Rsa(read_mpi(&mut from)?)
+        }
+        PublicKeyAlg::Dsa => {
+            PublicKeySig::Dsa {
+                r: read_mpi(&mut from)?,
+                s: read_mpi(&mut from)?,
+            }
+        }
+    };
+
+    Ok(Signature {
+        issuer,
+        authenticated_data: good_subpackets,
+        sig,
+    } )
+}
+
+fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
+    for (id, data) in parse_subpackets(&subpackets)? {
         if is_bit_set(id, 7) {
             bail!("unsupported critical subpacket: {}", id);
         }
 
         match id {
             16 => {
-                use hex::ToHex;
-                println!("issuer: {}", data.to_hex());
+                ensure!(8 == data.len(), "invalid issuer packet length: {}", data.len());
+                let mut array_sadness = [0u8; 8];
+                array_sadness.copy_from_slice(data);
+
+                // TODO: accepting the first value?
+                return Ok(Some(array_sadness));
             }
             _ => {
                 // SHOULD ignore non-critical
@@ -114,19 +153,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<()> {
         }
     }
 
-    let hash_hint = from.read_u16::<BigEndian>();
-
-    match key_alg {
-        PublicKeyAlg::RSA => {
-            read_mpi(&mut from)?;
-        },
-        PublicKeyAlg::DSA => {
-            read_mpi(&mut from)?;
-            read_mpi(&mut from)?;
-        }
-    }
-
-    Ok(())
+    return Ok(None);
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.3.1

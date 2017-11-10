@@ -12,5 +12,6 @@ fn split() {
 
 #[test]
 fn packets() {
-    gpgv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap()
+    let sig = gpgv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap();
+    assert!(sig.issuer.is_some());
 }
