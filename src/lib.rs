@@ -17,6 +17,7 @@ mod rsa;
 
 pub use armour::parse_clearsign_armour;
 pub use packets::parse_packet;
+pub use packets::Packet;
 pub use errors::*;
 
 #[derive(Copy, Clone)]

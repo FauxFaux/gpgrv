@@ -24,13 +24,26 @@ enum HashAlg {
     Sha512,
 }
 
+pub enum PubKey {
+    Rsa {
+        n: Vec<u8>,
+        e: Vec<u8>,
+    }
+}
+
+
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     authenticated_data: Vec<u8>,
     sig: PublicKeySig,
 }
 
-pub fn parse_packet<R: Read>(mut from: R) -> Result<Signature> {
+pub enum Packet {
+    PubKey(PubKey),
+    Signature(Signature),
+}
+
+pub fn parse_packet<R: Read>(mut from: R) -> Result<Packet> {
     let val = from.read_u8()?;
     ensure!(is_bit_set(val, 7), "invalid packet tag");
     let tag;
@@ -57,7 +70,8 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Signature> {
     let mut from = from.take(u64::from(len));
 
     let parsed = match tag {
-        2 => parse_signature_packet(&mut from),
+        2 => Packet::Signature(parse_signature_packet(&mut from)?),
+        6 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
         other => bail!("not supported: packet tag: {}, len: {}", other, len),
     };
 
@@ -67,7 +81,7 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Signature> {
         from.limit()
     );
 
-    parsed
+    Ok(parsed)
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
@@ -127,6 +141,25 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         issuer,
         authenticated_data: good_subpackets,
         sig,
+    })
+}
+
+fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKey> {
+    // https://tools.ietf.org/html/rfc4880#section-5.5.2
+    match from.read_u8()? {
+        3 => bail!("not supported: version 3 key packets"),
+        4 => {}
+        other => bail!("not supported: unrecognised key packet version: {}", other),
+    }
+
+    from.read_u32::<BigEndian>()?; // time
+
+    Ok(match from.read_u8()? {
+        1 => PubKey::Rsa {
+            n: read_mpi(&mut from)?,
+            e: read_mpi(&mut from)?,
+        },
+        other => bail!("not supported: unrecognised key type: {}", other),
     })
 }
 
@@ -211,7 +244,13 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
     from.read_exact(&mut data)?;
 
     let first_byte = data[0];
-    let first_bit_position = (8 - (bits % 8)) as u8;
+    let leading_bits = bits % 8;
+
+    let first_bit_position = if 0 == leading_bits {
+        0
+    } else {
+        (8 - leading_bits) as u8
+    };
 
     for i in 0..first_bit_position {
         ensure!(
@@ -247,6 +286,11 @@ mod tests {
         assert_eq!(
             vec![0x01, 0xff],
             read_mpi(Cursor::new(vec![0, 9, 0x01, 0xff])).unwrap()
+        );
+
+        assert_eq!(
+            vec![0xff],
+            read_mpi(Cursor::new(vec![0, 8, 0xff])).unwrap()
         );
 
         // invalid: bit length refers to a bit that's not set
