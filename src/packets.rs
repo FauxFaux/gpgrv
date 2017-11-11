@@ -114,9 +114,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     let hash_hint = from.read_u16::<BigEndian>();
 
     let sig = match key_alg {
-        PublicKeyAlg::Rsa => {
-            PublicKeySig::Rsa(read_mpi(&mut from)?)
-        }
+        PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
         PublicKeyAlg::Dsa => {
             PublicKeySig::Dsa {
                 r: read_mpi(&mut from)?,
@@ -129,7 +127,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         issuer,
         authenticated_data: good_subpackets,
         sig,
-    } )
+    })
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.4.1
@@ -143,7 +141,11 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
 
         match id {
             16 => {
-                ensure!(8 == data.len(), "invalid issuer packet length: {}", data.len());
+                ensure!(
+                    8 == data.len(),
+                    "invalid issuer packet length: {}",
+                    data.len()
+                );
                 let mut array_sadness = [0u8; 8];
                 array_sadness.copy_from_slice(data);
 

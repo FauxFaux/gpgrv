@@ -5,12 +5,15 @@ extern crate digest;
 #[macro_use]
 extern crate error_chain;
 extern crate hex;
+extern crate gmp;
 extern crate sha_1;
 extern crate sha2;
 
 mod armour;
 mod errors;
+mod mpi;
 mod packets;
+mod rsa;
 
 pub use armour::parse_clearsign_armour;
 pub use packets::parse_packet;
