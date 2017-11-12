@@ -10,6 +10,7 @@ use keyring::Keyring;
 
 use errors::*;
 
+use PublicKeySig;
 use to_u32;
 
 pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result<()> {
@@ -25,16 +26,24 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len()));
 
-    let digest = digest.hash();
+    let hash = digest.hash();
 
-    ensure!(BigEndian::read_u16(&digest) == sig.hash_hint,
-        "digest hint doesn't match; digest is probably wrong");
+    ensure!(
+        BigEndian::read_u16(&hash) == sig.hash_hint,
+        "digest hint doesn't match; digest is probably wrong"
+    );
+
+    let padded = match sig.sig {
+        PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
+        other => bail!("unsupported signature"),
+    };
+
 
     for key in keyring.as_slice() {
-        ::verify(key, &sig.sig, &digest)?;
+        ::verify(key, &sig.sig, &padded)?;
     }
 
-    unimplemented!()
+    Ok(())
 }
 
 fn make_tail(len: usize) -> [u8; 6] {
