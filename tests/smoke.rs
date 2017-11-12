@@ -12,6 +12,11 @@ fn split() {
 }
 
 #[test]
+fn verify() {
+    gpgv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
+}
+
+#[test]
 fn packets_sig() {
     use gpgv::Packet::*;
     match gpgv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap() {
@@ -24,9 +29,11 @@ fn packets_sig() {
 fn packets_key() {
     use gpgv::Packet::*;
     match gpgv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
-        PubKey(key) => match key {
-            _ => {},
-        },
+        PubKey(key) => {
+            match key {
+                _ => {}
+            }
+        }
         _ => panic!("wrong type of packet"),
     }
 }

@@ -1,0 +1,39 @@
+use std::io;
+use std::io::BufRead;
+
+use byteorder::ByteOrder;
+use byteorder::BigEndian;
+
+use armour;
+use packets;
+
+use errors::*;
+
+use to_u32;
+
+pub fn verify_clearsign_armour<R: BufRead>(from: R) -> Result<()> {
+    let mut armour_removed = armour::parse_clearsign_armour(from)?;
+    let sig_packets = io::Cursor::new(armour_removed.signature);
+    let sig = match packets::parse_packet(sig_packets)? {
+        packets::Packet::Signature(s) => s,
+        other => bail!("unexpected packet in signature: {:?}"),
+    };
+
+    let digest = &mut armour_removed.digest;
+    digest.process(&sig.authenticated_data);
+    digest.process(&make_tail(sig.authenticated_data.len()));
+
+    let digest = digest.hash();
+
+    ::verify(&::PubKey::Rsa { n: Vec::new(), e: Vec::new() }, &sig.sig, &digest)?;
+
+    unimplemented!()
+}
+
+fn make_tail(len: usize) -> [u8; 6] {
+    let mut tail = [0u8; 6];
+    tail[0] = 0x04;
+    tail[1] = 0xff;
+    BigEndian::write_u32(&mut tail[2..], to_u32(len));
+    tail
+}

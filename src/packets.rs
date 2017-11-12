@@ -5,6 +5,9 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 
+use PublicKeySig;
+use PubKey;
+
 use errors::*;
 use usize_from;
 use usize_from_u32;
@@ -14,29 +17,16 @@ enum PublicKeyAlg {
     Dsa,
 }
 
-enum PublicKeySig {
-    Rsa(Vec<u8>),
-    Dsa { r: Vec<u8>, s: Vec<u8> },
-}
-
 enum HashAlg {
     Sha1,
     Sha256,
     Sha512,
 }
 
-pub enum PubKey {
-    Rsa {
-        n: Vec<u8>,
-        e: Vec<u8>,
-    }
-}
-
-
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
-    authenticated_data: Vec<u8>,
-    sig: PublicKeySig,
+    pub authenticated_data: Vec<u8>,
+    pub sig: PublicKeySig,
 }
 
 pub enum Packet {
@@ -299,10 +289,7 @@ mod tests {
             read_mpi(Cursor::new(vec![0, 9, 0x01, 0xff])).unwrap()
         );
 
-        assert_eq!(
-            vec![0xff],
-            read_mpi(Cursor::new(vec![0, 8, 0xff])).unwrap()
-        );
+        assert_eq!(vec![0xff], read_mpi(Cursor::new(vec![0, 8, 0xff])).unwrap());
 
         // invalid: bit length refers to a bit that's not set
         assert!(read_mpi(Cursor::new(vec![0, 2, 0b0000_0001])).is_err());

@@ -1,3 +1,4 @@
+use digest::Digest;
 use digest::Input;
 use digest::FixedOutput;
 
@@ -8,19 +9,26 @@ pub enum Digestable {
 }
 
 impl Digestable {
-    // Like digest::Input
-    pub fn process(&mut self, data: &[u8]) {
+    pub fn input(&mut self) -> &mut Input {
         use self::Digestable::*;
-        match self {
-            &mut Sha1(mut x) => x.process(data),
-            &mut Sha256(mut x) => x.process(data),
-            &mut Sha512(mut x) => x.process(data),
+        match *self {
+            Sha1(ref mut x) => x,
+            Sha256(ref mut x) => x,
+            Sha512(ref mut x) => x,
         }
     }
-}
 
-impl Input for Digestable {
-    fn process(&mut self, data: &[u8]) {
-        Self::process(self, data)
+    // Like digest::Input
+    pub fn process(&mut self, data: &[u8]) {
+        self.input().process(data)
+    }
+
+    pub fn hash(&self) -> Vec<u8> {
+        use self::Digestable::*;
+        match *self {
+            Sha1(x) => x.hash().to_vec(),
+            Sha256(x) => x.fixed_result().to_vec(),
+            Sha512(x) => x.fixed_result().to_vec(),
+        }
     }
 }

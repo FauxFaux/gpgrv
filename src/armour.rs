@@ -11,9 +11,9 @@ const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
 const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 pub struct Signature {
-    digest: Digestable,
-    headers: HashMap<String, String>,
-    signature: Vec<u8>,
+    pub digest: Digestable,
+    pub headers: HashMap<String, String>,
+    pub signature: Vec<u8>,
 }
 
 pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
