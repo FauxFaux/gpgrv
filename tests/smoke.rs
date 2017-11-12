@@ -1,4 +1,4 @@
-extern crate gpgv;
+extern crate gpgrv;
 
 use std::io;
 
@@ -8,18 +8,18 @@ const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
 
 #[test]
 fn split() {
-    gpgv::parse_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
+    gpgrv::parse_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
 }
 
 #[test]
 fn verify() {
-    gpgv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
+    gpgrv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
 }
 
 #[test]
 fn packets_sig() {
-    use gpgv::Packet::*;
-    match gpgv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap() {
+    use gpgrv::Packet::*;
+    match gpgrv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap() {
         Signature(sig) => assert!(sig.issuer.is_some()),
         _ => panic!("wrong type of packet"),
     }
@@ -27,8 +27,8 @@ fn packets_sig() {
 
 #[test]
 fn packets_key() {
-    use gpgv::Packet::*;
-    match gpgv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
+    use gpgrv::Packet::*;
+    match gpgrv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
         PubKey(key) => {
             match key {
                 _ => {}

@@ -1,6 +1,6 @@
 [package]
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
-name = "gpgv"
+name = "gpgrv"
 version = "0.1.0"
 
 [dependencies]
