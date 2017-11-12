@@ -6,6 +6,7 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 
+use HashAlg;
 use PublicKeySig;
 use PubKey;
 
@@ -18,17 +19,12 @@ enum PublicKeyAlg {
     Dsa,
 }
 
-enum HashAlg {
-    Sha1,
-    Sha256,
-    Sha512,
-}
-
 #[derive(Debug)]
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     pub authenticated_data: Vec<u8>,
     pub sig: PublicKeySig,
+    pub hash_alg: HashAlg,
     pub hash_hint: u16,
 }
 
@@ -51,7 +47,7 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
 
     if is_bit_set(val, 6) {
         // new format
-        tag = val & 0b0011_1111;
+        //        tag = val & 0b0011_1111;
 
         bail!("not supported: new format");
     } else {
@@ -152,6 +148,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         authenticated_data,
         sig,
         hash_hint,
+        hash_alg,
     })
 }
 

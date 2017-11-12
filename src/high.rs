@@ -19,7 +19,7 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
     let sig = match packets::parse_packet(sig_packets)? {
         Some(packets::Packet::Signature(s)) => s,
         None => bail!("no signature in signature stream"),
-        other => bail!("unexpected packet in signature: {:?}"),
+        other => bail!("unexpected packet in signature: {:?}", other),
     };
 
     let digest = &mut armour_removed.digest;
@@ -35,7 +35,7 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
 
     let padded = match sig.sig {
         PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
-        other => bail!("unsupported signature"),
+        _ => bail!("unsupported signature"),
     };
 
 

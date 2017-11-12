@@ -1,4 +1,3 @@
-use digest::Digest;
 use digest::Input;
 use digest::FixedOutput;
 

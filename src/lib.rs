@@ -36,6 +36,13 @@ pub enum PubKey {
     Rsa { n: Vec<u8>, e: Vec<u8> },
 }
 
+#[derive(Debug)]
+pub enum HashAlg {
+    Sha1,
+    Sha256,
+    Sha512,
+}
+
 pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {
     match key {
         &PubKey::Rsa { ref n, ref e } => {
