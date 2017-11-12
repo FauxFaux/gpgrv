@@ -2,6 +2,7 @@ use std::io::Read;
 use std::u32;
 
 use byteorder::BigEndian;
+use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 
 use errors::*;
@@ -85,9 +86,16 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Packet> {
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
+    // this would not work for version 3 packets, which we're not processing,
+    // as their authenticated data section is different
+
+    let mut authenticated_data = Vec::with_capacity(32);
+    authenticated_data.resize(6, 0);
+    from.read_exact(&mut authenticated_data[0..6])?;
+
     {
         // https://tools.ietf.org/html/rfc4880#section-5.2.3
-        match from.read_u8()? {
+        match authenticated_data[0] {
             3 => bail!("not supported: version 3 signatures"),
             4 => {}
             other => bail!("not supported: unrecognised signature version: {}", other),
@@ -96,8 +104,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
 
     {
         // https://tools.ietf.org/html/rfc4880#section-5.2.1
-        let sig_type = from.read_u8()?;
-        match sig_type {
+        match authenticated_data[1] {
             0x01 => {
                 // canonicalised text document, what we're implementing
             }
@@ -106,21 +113,25 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     }
 
     // https://tools.ietf.org/html/rfc4880#section-9.1
-    let key_alg = match from.read_u8()? {
+    let key_alg = match authenticated_data[2] {
         1 | 3 => PublicKeyAlg::Rsa,
         17 => PublicKeyAlg::Dsa,
         other => bail!("not supported: key algorithm: {}", other),
     };
 
     // https://tools.ietf.org/html/rfc4880#section-9.4
-    let hash_alg = match from.read_u8()? {
+    let hash_alg = match authenticated_data[3] {
         2 => HashAlg::Sha1,
         8 => HashAlg::Sha256,
         10 => HashAlg::Sha512,
         other => bail!("not supported: hash algorithm: {}", other),
     };
 
-    let good_subpackets = read_u16_prefixed_data(&mut from)?;
+    let good_subpackets_len = BigEndian::read_u16(&authenticated_data[4..6]);
+    let good_subpackets_end = authenticated_data.len() + usize_from(good_subpackets_len);
+    authenticated_data.resize(good_subpackets_end, 0);
+    from.read_exact(&mut authenticated_data[6..])?;
+
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
     let issuer = find_issuer(&bad_subpackets)?;
@@ -139,7 +150,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
 
     Ok(Signature {
         issuer,
-        authenticated_data: good_subpackets,
+        authenticated_data,
         sig,
     })
 }
