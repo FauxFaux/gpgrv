@@ -1,3 +1,4 @@
+use std::io;
 use std::io::Read;
 use std::u32;
 
@@ -23,19 +24,26 @@ enum HashAlg {
     Sha512,
 }
 
+#[derive(Debug)]
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     pub authenticated_data: Vec<u8>,
     pub sig: PublicKeySig,
 }
 
+#[derive(Debug)]
 pub enum Packet {
     PubKey(PubKey),
     Signature(Signature),
 }
 
-pub fn parse_packet<R: Read>(mut from: R) -> Result<Packet> {
-    let val = from.read_u8()?;
+pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
+    let val = match from.read_u8() {
+        Ok(val) => val,
+        Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(other) => bail!(other),
+    };
+
     ensure!(is_bit_set(val, 7), "invalid packet tag");
     let tag;
     let len;
@@ -72,7 +80,7 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Packet> {
         from.limit()
     );
 
-    Ok(parsed)
+    Ok(Some(parsed))
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {

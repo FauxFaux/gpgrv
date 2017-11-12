@@ -13,32 +13,37 @@ mod armour;
 mod digestable;
 mod errors;
 mod high;
+mod keyring;
 mod mpi;
 mod packets;
 mod rsa;
 
 pub use armour::parse_clearsign_armour;
 pub use high::verify_clearsign_armour;
+pub use keyring::Keyring;
 pub use packets::parse_packet;
 pub use packets::Packet;
 pub use errors::*;
 
-
+#[derive(Debug)]
 pub enum PublicKeySig {
     Rsa(Vec<u8>),
     Dsa { r: Vec<u8>, s: Vec<u8> },
 }
 
+#[derive(Debug)]
 pub enum PubKey {
     Rsa { n: Vec<u8>, e: Vec<u8> },
 }
 
 pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {
     match key {
-        &PubKey::Rsa{ ref n, ref e } => match sig {
-            &PublicKeySig::Rsa ( ref sig ) => rsa::verify(sig, (n, e), padded_hash),
-            _ => bail!("key/signature type mismatch"),
-        },
+        &PubKey::Rsa { ref n, ref e } => {
+            match sig {
+                &PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
+                _ => bail!("key/signature type mismatch"),
+            }
+        }
     }
 }
 

@@ -6,16 +6,18 @@ use byteorder::BigEndian;
 
 use armour;
 use packets;
+use keyring::Keyring;
 
 use errors::*;
 
 use to_u32;
 
-pub fn verify_clearsign_armour<R: BufRead>(from: R) -> Result<()> {
+pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result<()> {
     let mut armour_removed = armour::parse_clearsign_armour(from)?;
     let sig_packets = io::Cursor::new(armour_removed.signature);
     let sig = match packets::parse_packet(sig_packets)? {
-        packets::Packet::Signature(s) => s,
+        Some(packets::Packet::Signature(s)) => s,
+        None => bail!("no signature in signature stream"),
         other => bail!("unexpected packet in signature: {:?}"),
     };
 
@@ -25,7 +27,9 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R) -> Result<()> {
 
     let digest = digest.hash();
 
-    ::verify(&::PubKey::Rsa { n: Vec::new(), e: Vec::new() }, &sig.sig, &digest)?;
+    for key in keyring.as_slice() {
+        ::verify(key, &sig.sig, &digest)?;
+    }
 
     unimplemented!()
 }

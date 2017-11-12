@@ -1,6 +1,7 @@
 extern crate gpgrv;
 
 use std::io;
+use std::fs;
 
 const HELLO_WORLD: &str = include_str!("hello-world.asc");
 const EMPTY_SIG: &[u8] = include_bytes!("empty-message.inline-sig");
@@ -13,15 +14,17 @@ fn split() {
 
 #[test]
 fn verify() {
-    gpgrv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
+    let mut keyring = gpgrv::Keyring::new();
+    keyring.append_keys_from(io::Cursor::new(FAUX_KEY));
+    gpgrv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes()), &keyring).unwrap();
 }
 
 #[test]
 fn packets_sig() {
     use gpgrv::Packet::*;
     match gpgrv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap() {
-        Signature(sig) => assert!(sig.issuer.is_some()),
-        _ => panic!("wrong type of packet"),
+        Some(Signature(sig)) => assert!(sig.issuer.is_some()),
+        _ => panic!("wrong type of/missing packet"),
     }
 }
 
@@ -29,11 +32,11 @@ fn packets_sig() {
 fn packets_key() {
     use gpgrv::Packet::*;
     match gpgrv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
-        PubKey(key) => {
+        Some(PubKey(key)) => {
             match key {
                 _ => {}
             }
         }
-        _ => panic!("wrong type of packet"),
+        _ => panic!("wrong type of/missing packet"),
     }
 }

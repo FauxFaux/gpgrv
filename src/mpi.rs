@@ -2,7 +2,16 @@ use gmp::mpz::Mpz;
 
 #[inline]
 pub fn pow_mod(val: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
+    pre_validate_number(val);
+    pre_validate_number(exp);
+    pre_validate_number(modulus);
     Vec::from(&Mpz::from(val).powm(&Mpz::from(exp), &Mpz::from(modulus)))
+}
+
+#[inline]
+fn pre_validate_number(val: &[u8]) {
+    assert!(!val.is_empty(), "no bytes is no number");
+    assert!(val.len() > 1 || val[0] != 0, "zero is not okay");
 }
 
 #[cfg(test)]
