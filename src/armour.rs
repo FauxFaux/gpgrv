@@ -51,6 +51,8 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         None => bail!("'Hash' header is mandatory"),
     };
 
+    let mut first = true;
+
     loop {
         let line = lines.next().ok_or("unexpected EOF looking for signature")??;
 
@@ -69,8 +71,14 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
             &line
         };
 
+        // we don't want a trailing newline, apparently,
+        // even though it's always there in the message
+        if !first {
+            digest.process(b"\r\n");
+            first = false;
+        }
+
         digest.process(line.as_bytes());
-        digest.process(b"\r\n");
     }
 
     let line = lines.next().ok_or(
