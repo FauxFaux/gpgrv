@@ -22,6 +22,11 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
         other => bail!("unexpected packet in signature: {:?}", other),
     };
 
+    match sig.sig_type {
+        packets::SignatureType::CanonicalisedText => {},
+        other => bail!("invalid signature type in armour: {:?}", other),
+    };
+
     let digest = &mut armour_removed.digest;
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len()));
@@ -40,10 +45,12 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
 
 
     for key in keyring.as_slice() {
-        ::verify(key, &sig.sig, &padded)?;
+        if ::verify(key, &sig.sig, &padded).is_ok() {
+            return Ok(())
+        }
     }
 
-    Ok(())
+    bail!("no known keys could validate the signature");
 }
 
 fn make_tail(len: usize) -> [u8; 6] {

@@ -21,6 +21,8 @@ impl Keyring {
         loop {
             match packets::parse_packet(&mut reader)? {
                 Some(packets::Packet::PubKey(key)) => self.keys.push(key),
+                Some(packets::Packet::IgnoredJunk) => continue,
+                Some(packets::Packet::Signature(_)) => continue,
                 None => break,
                 other => bail!("unexpected packet in keyring: {:?}", other),
             }

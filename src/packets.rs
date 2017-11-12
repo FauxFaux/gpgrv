@@ -20,16 +20,28 @@ enum PublicKeyAlg {
 }
 
 #[derive(Debug)]
+pub enum SignatureType {
+    CanonicalisedText,
+    GenericCertificationUserId,
+    CasualCertificationUserId,
+    PositiveCertificationUserId,
+    SubkeyBinding,
+    PrimaryKeyBinding,
+}
+
+#[derive(Debug)]
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     pub authenticated_data: Vec<u8>,
     pub sig: PublicKeySig,
+    pub sig_type: SignatureType,
     pub hash_alg: HashAlg,
     pub hash_hint: u16,
 }
 
 #[derive(Debug)]
 pub enum Packet {
+    IgnoredJunk,
     PubKey(PubKey),
     Signature(Signature),
 }
@@ -67,7 +79,14 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
 
     let parsed = match tag {
         2 => Packet::Signature(parse_signature_packet(&mut from)?),
-        6 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
+        // 6: public key
+        // 14: public subkey
+        6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
+        // 13: user id (textual name)
+        13 => {
+            from.read_exact(&mut vec![0u8; usize_from_u32(len)])?;
+            Packet::IgnoredJunk
+        }
         other => bail!("not supported: packet tag: {}, len: {}", other, len),
     };
 
@@ -97,15 +116,16 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         }
     }
 
-    {
-        // https://tools.ietf.org/html/rfc4880#section-5.2.1
-        match authenticated_data[1] {
-            0x01 => {
-                // canonicalised text document, what we're implementing
-            }
-            other => bail!("not supported: signature type: {}", other),
-        }
-    }
+    // https://tools.ietf.org/html/rfc4880#section-5.2.1
+    let sig_type = match authenticated_data[1] {
+        0x01 => SignatureType::CanonicalisedText,
+        0x10 => SignatureType::GenericCertificationUserId,
+        0x12 => SignatureType::CasualCertificationUserId,
+        0x13 => SignatureType::PositiveCertificationUserId,
+        0x18 => SignatureType::SubkeyBinding,
+        0x19 => SignatureType::PrimaryKeyBinding,
+        other => bail!("not supported: signature type: {}", other),
+    };
 
     // https://tools.ietf.org/html/rfc4880#section-9.1
     let key_alg = match authenticated_data[2] {
@@ -147,6 +167,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         issuer,
         authenticated_data,
         sig,
+        sig_type,
         hash_hint,
         hash_alg,
     })

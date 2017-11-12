@@ -1,7 +1,6 @@
 extern crate gpgrv;
 
 use std::io;
-use std::fs;
 
 const HELLO_WORLD: &str = include_str!("hello-world.asc");
 const EMPTY_SIG: &[u8] = include_bytes!("empty-message.inline-sig");
@@ -15,7 +14,7 @@ fn split() {
 #[test]
 fn verify() {
     let mut keyring = gpgrv::Keyring::new();
-    keyring.append_keys_from(io::Cursor::new(FAUX_KEY));
+    keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
     gpgrv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes()), &keyring).unwrap();
 }
 
