@@ -3,18 +3,15 @@ use std::io::BufRead;
 
 use base64;
 
-use digest::Digest;
-use digest::FixedOutput;
-
+use digestable::Digestable;
 use errors::*;
-use Digests;
 
 const BEGIN_SIGNED: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
 const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 pub struct Signature {
-    digest: Digests,
+    digest: Digestable,
     headers: HashMap<String, String>,
     signature: Vec<u8>,
 }
@@ -46,9 +43,13 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         headers.insert(key.to_string(), colon_value[2..].to_string());
     }
 
-    let mut sha1 = ::sha_1::Sha1::default();
-    let mut sha256 = ::sha2::Sha256::default();
-    let mut sha512 = ::sha2::Sha512::default();
+    let mut digest = match headers.get("Hash").map(|x| x.as_str()) {
+        Some("SHA1") => Digestable::Sha1(::sha_1::Sha1::default()),
+        Some("SHA256") => Digestable::Sha256(::sha2::Sha256::default()),
+        Some("SHA512") => Digestable::Sha512(::sha2::Sha512::default()),
+        Some(other) => bail!("unsupported Hash header: {:?}", other),
+        None => bail!("'Hash' header is mandatory"),
+    };
 
     loop {
         let line = lines.next().ok_or("unexpected EOF looking for signature")??;
@@ -68,9 +69,8 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
             &line
         };
 
-        push_line(sha1, line);
-        push_line(sha256, line);
-        push_line(sha512, line);
+        digest.process(line.as_bytes());
+        digest.process(b"\r\n");
     }
 
     let line = lines.next().ok_or(
@@ -112,24 +112,9 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
 
     let signature = base64::decode(&signature)?;
 
-    // Arrays, such sigh.
-    let mut digest = Digests::default();
-    digest.sha1.copy_from_slice(sha1.fixed_result().as_slice());
-    digest.sha256.copy_from_slice(
-        sha256.fixed_result().as_slice(),
-    );
-    digest.sha512.copy_from_slice(
-        sha512.fixed_result().as_slice(),
-    );
-
     Ok(Signature {
         digest,
         headers,
         signature,
     })
-}
-
-fn push_line<D: Digest>(mut digest: D, line: &str) {
-    digest.process(line.as_bytes());
-    digest.process(b"\r\n");
 }

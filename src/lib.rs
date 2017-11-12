@@ -10,6 +10,7 @@ extern crate sha_1;
 extern crate sha2;
 
 mod armour;
+mod digestable;
 mod errors;
 mod mpi;
 mod packets;
@@ -20,22 +21,6 @@ pub use packets::parse_packet;
 pub use packets::Packet;
 pub use errors::*;
 
-#[derive(Copy, Clone)]
-struct Digests {
-    sha1: [u8; 20],
-    sha256: [u8; 32],
-    sha512: [u8; 64],
-}
-
-impl Default for Digests {
-    fn default() -> Self {
-        Digests {
-            sha1: [0u8; 20],
-            sha256: [0u8; 32],
-            sha512: [0u8; 64],
-        }
-    }
-}
 
 /// https://github.com/rust-lang/rust/issues/44290
 fn usize_from(val: u16) -> usize {
