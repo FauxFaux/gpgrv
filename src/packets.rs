@@ -29,6 +29,7 @@ pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     pub authenticated_data: Vec<u8>,
     pub sig: PublicKeySig,
+    pub hash_hint: u16,
 }
 
 #[derive(Debug)]
@@ -134,7 +135,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
 
     let issuer = find_issuer(&bad_subpackets)?;
 
-    let hash_hint = from.read_u16::<BigEndian>();
+    let hash_hint = from.read_u16::<BigEndian>()?;
 
     let sig = match key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
@@ -150,6 +151,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         issuer,
         authenticated_data,
         sig,
+        hash_hint,
     })
 }
 

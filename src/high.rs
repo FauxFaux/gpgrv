@@ -27,6 +27,9 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
 
     let digest = digest.hash();
 
+    ensure!(BigEndian::read_u16(&digest) == sig.hash_hint,
+        "digest hint doesn't match; digest is probably wrong");
+
     for key in keyring.as_slice() {
         ::verify(key, &sig.sig, &digest)?;
     }
