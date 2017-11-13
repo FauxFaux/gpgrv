@@ -13,7 +13,8 @@ const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 pub struct Signature {
     pub digest: Digestable,
-    pub headers: HashMap<String, String>,
+    pub body_headers: HashMap<String, String>,
+    pub sig_headers: HashMap<String, String>,
     pub signature: Vec<u8>,
 }
 
@@ -29,9 +30,9 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         BEGIN_SIGNED
     );
 
-    let headers = take_headers(&mut lines)?;
+    let body_headers = take_headers(&mut lines)?;
 
-    let mut digest = match headers.get("Hash").map(|x| x.as_str()) {
+    let mut digest = match body_headers.get("Hash").map(|x| x.as_str()) {
         Some("SHA1") => Digestable::Sha1(::sha_1::Sha1::default()),
         Some("SHA256") => Digestable::Sha256(::sha2::Sha256::default()),
         Some("SHA512") => Digestable::Sha512(::sha2::Sha512::default()),
@@ -102,7 +103,8 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
 
     Ok(Signature {
         digest,
-        headers,
+        body_headers,
+        sig_headers,
         signature,
     })
 }
