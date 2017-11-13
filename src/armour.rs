@@ -64,8 +64,8 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         // even though it's always there in the message
         if !first {
             digest.process(b"\r\n");
-            first = false;
         }
+        first = false;
 
         digest.process(line.as_bytes());
     }
