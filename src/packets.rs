@@ -28,6 +28,8 @@ pub enum SignatureType {
     SubkeyBinding,
     PrimaryKeyBinding,
     SignatureDirectlyOnKey,
+    SubkeyRevocationSignature,
+    CertificationRevocationSignature,
 }
 
 #[derive(Debug)]
@@ -126,7 +128,9 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         0x18 => SignatureType::SubkeyBinding,
         0x19 => SignatureType::PrimaryKeyBinding,
         0x1f => SignatureType::SignatureDirectlyOnKey,
-        other => bail!("not supported: signature type: {:02x}", other),
+        0x28 => SignatureType::SubkeyRevocationSignature,
+        0x30 => SignatureType::CertificationRevocationSignature,
+        other => bail!("not supported: signature type: 0x{:02x}", other),
     };
 
     // https://tools.ietf.org/html/rfc4880#section-9.1
@@ -140,7 +144,9 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     let hash_alg = match authenticated_data[3] {
         2 => HashAlg::Sha1,
         8 => HashAlg::Sha256,
+        9 => HashAlg::Sha384,
         10 => HashAlg::Sha512,
+        11 => HashAlg::Sha224,
         other => bail!("not supported: hash algorithm: {}", other),
     };
 
@@ -190,6 +196,23 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKey> {
             n: read_mpi(&mut from)?,
             e: read_mpi(&mut from)?,
         },
+        16 => PubKey::Elgaml {
+            p: read_mpi(&mut from)?,
+            g: read_mpi(&mut from)?,
+            y: read_mpi(&mut from)?,
+        },
+        19 => {
+            // https://tools.ietf.org/html/rfc6637#section-9
+            let oid_len = from.read_u8()?;
+            ensure!(0 != oid_len && 0xff != oid_len, "reserved ecdsa oid lengths");
+            let mut oid = vec![0u8; usize::from(oid_len)];
+            from.read_exact(&mut oid)?;
+
+            PubKey::Ecdsa {
+                oid,
+                point: read_mpi(&mut from)?
+            }
+        },
         other => bail!("not supported: unrecognised key type: {}", other),
     })
 }
@@ -233,12 +256,26 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>> {
     let mut ret = Vec::with_capacity(data.len() / 4);
 
     while !data.is_empty() {
-        let len = usize::from(data[0]);
-        ensure!(len < 192, "not supported [laziness]: long sub packets");
+        // https://tools.ietf.org/html/rfc4880#section-5.2.3.1
+        let len;
+        let len_len;
+
+        if data[0] < 192 {
+            len_len = 1;
+            len = usize::from(data[0]);
+        } else if data[0] < 255 {
+            len_len = 2;
+            len = (usize::from(data[0] - 192) << 8) + usize::from(data[1]) + 192;
+        } else {
+            assert_eq!(255, data[0]);
+            len_len = 5;
+            len = usize_from_u32(BigEndian::read_u32(&data[1..5]));
+        }
+
         ensure!(len != 0, "illegal empty subpacket");
 
-        // data starts after the length (currently always 1 byte) and the id (one byte)
-        let data_start = 1 + 1;
+        // data starts after the length and the id (one byte)
+        let data_start = len_len + 1;
 
         // `len` includes the id byte, but not the stored length; so take the id byte off
         let data_end = data_start + len - 1;

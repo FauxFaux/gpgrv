@@ -34,12 +34,16 @@ pub enum PublicKeySig {
 #[derive(Debug)]
 pub enum PubKey {
     Rsa { n: Vec<u8>, e: Vec<u8> },
+    Ecdsa { oid: Vec<u8>, point: Vec<u8> },
+    Elgaml { p: Vec<u8>, g: Vec<u8>, y: Vec<u8> },
 }
 
 #[derive(Debug)]
 pub enum HashAlg {
     Sha1,
+    Sha224,
     Sha256,
+    Sha384,
     Sha512,
 }
 
@@ -51,6 +55,8 @@ pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()
                 _ => bail!("key/signature type mismatch"),
             }
         }
+        &PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
+        &PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
     }
 }
 
