@@ -10,7 +10,6 @@ digest = "0.6"
 error-chain = "0.11"
 sha2 = "0.6"
 
-# TODO: unreleased code, actually pulls in the entirety of num which we don't need
 [dependencies.num-bigint]
 git = "https://github.com/rust-num/num/"
 rev = "a203e9f9fc438d05007fe65fd59581fc4c8b2dff"
@@ -18,3 +17,9 @@ rev = "a203e9f9fc438d05007fe65fd59581fc4c8b2dff"
 [dependencies.sha-1]
 features = ["generic"]
 version = "0.4"
+
+[dev-dependencies]
+clap = "2.27"
+
+[profile.release]
+lto = true
