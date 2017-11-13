@@ -14,6 +14,5 @@ pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<
         return Ok(());
     }
 
-    use hex::ToHex;
-    bail!("{} != {}", expected.to_hex(), padded_hash.to_hex());
+    bail!("signatures don't match");
 }

@@ -8,8 +8,6 @@ base64 = "0.7"
 byteorder = "1.1"
 digest = "0.6"
 error-chain = "0.11"
-hex = "0.2"
-rust-gmp = "0.5"
 sha2 = "0.6"
 
 # TODO: unreleased code, actually pulls in the entirety of num which we don't need
