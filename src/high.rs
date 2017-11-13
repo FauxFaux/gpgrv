@@ -23,7 +23,7 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
     };
 
     match sig.sig_type {
-        packets::SignatureType::CanonicalisedText => {},
+        packets::SignatureType::CanonicalisedText => {}
         other => bail!("invalid signature type in armour: {:?}", other),
     };
 
@@ -46,7 +46,7 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
 
     for key in keyring.as_slice() {
         if ::verify(key, &sig.sig, &padded).is_ok() {
-            return Ok(())
+            return Ok(());
         }
     }
 

@@ -1,11 +1,16 @@
-use gmp::mpz::Mpz;
+use num_bigint::BigUint;
 
 #[inline]
 pub fn pow_mod(val: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     pre_validate_number(val);
     pre_validate_number(exp);
     pre_validate_number(modulus);
-    Vec::from(&Mpz::from(val).powm(&Mpz::from(exp), &Mpz::from(modulus)))
+    BigUint::from_bytes_be(val)
+        .modpow(
+            &BigUint::from_bytes_be(exp),
+            &BigUint::from_bytes_be(modulus),
+        )
+        .to_bytes_be()
 }
 
 #[inline]
