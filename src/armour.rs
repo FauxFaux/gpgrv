@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::BufRead;
+use std::io::Lines;
 
 use base64;
 
@@ -28,20 +29,7 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         BEGIN_SIGNED
     );
 
-    let mut headers = HashMap::with_capacity(4);
-    loop {
-        let header = lines.next().ok_or("unexpected EOF reading headers")??;
-        let header = header.trim();
-        if header.is_empty() {
-            break;
-        }
-
-        let (key, colon_value) = header.split_at(header.find(": ").ok_or_else(|| {
-            format!("header {:?} must contain a colon space", header)
-        })?);
-
-        headers.insert(key.to_string(), colon_value[2..].to_string());
-    }
+    let headers = take_headers(&mut lines)?;
 
     let mut digest = match headers.get("Hash").map(|x| x.as_str()) {
         Some("SHA1") => Digestable::Sha1(::sha_1::Sha1::default()),
@@ -81,15 +69,7 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         digest.process(line.as_bytes());
     }
 
-    let line = lines.next().ok_or(
-        "unexpected EOF reading 'headers' in signature",
-    )??;
-
-    ensure!(
-        line.trim().is_empty(),
-        "expecting a blank line at the start of a signature, not {:?}",
-        line
-    );
+    let sig_headers = take_headers(&mut lines)?;
 
     let mut signature = String::with_capacity(1024);
 
@@ -125,4 +105,23 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         headers,
         signature,
     })
+}
+
+fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, String>> {
+    let mut headers = HashMap::new();
+    loop {
+        let header = lines.next().ok_or("unexpected EOF reading headers")??;
+        let header = header.trim();
+        if header.is_empty() {
+            break;
+        }
+
+        let (key, colon_value) = header.split_at(header.find(": ").ok_or_else(|| {
+            format!("header {:?} must contain a colon space", header)
+        })?);
+
+        headers.insert(key.to_string(), colon_value[2..].to_string());
+    }
+
+    Ok(headers)
 }
