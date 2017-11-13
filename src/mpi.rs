@@ -24,9 +24,17 @@ mod tests {
 
     #[test]
     fn powm() {
-        assert_eq!(&[125], super::pow_mod(&[5], &[3], &[255]).to_bytes_be().as_slice());
+        assert_eq!(
+            &[125],
+            super::pow_mod(&[5], &[3], &[255]).to_bytes_be().as_slice()
+        );
         // (259^3) % 513 == 283
-        assert_eq!(&[1, 211], super::pow_mod(&[1, 7], &[3], &[2, 1]).to_bytes_be().as_slice());
+        assert_eq!(
+            &[1, 211],
+            super::pow_mod(&[1, 7], &[3], &[2, 1])
+                .to_bytes_be()
+                .as_slice()
+        );
     }
 
     #[test]
