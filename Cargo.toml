@@ -8,6 +8,7 @@ base64 = "0.7"
 byteorder = "1.1"
 digest = "0.6"
 error-chain = "0.11"
+hex = "0.3"
 sha2 = "0.6"
 
 [dependencies.num]
@@ -20,6 +21,5 @@ version = "0.4"
 
 [dev-dependencies]
 clap = "2.27"
-
 [profile.release]
 lto = true

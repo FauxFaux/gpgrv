@@ -33,10 +33,16 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
 
     let hash = digest.hash();
 
-    ensure!(
-        BigEndian::read_u16(&hash) == sig.hash_hint,
-        "digest hint doesn't match; digest is probably wrong"
-    );
+    {
+        let actual = BigEndian::read_u16(&hash);
+        ensure!(
+            actual == sig.hash_hint,
+            "digest hint doesn't match; digest is probably wrong, exp: {:04x}, act: {:04x}",
+            sig.hash_hint,
+            actual,
+        );
+
+    }
 
     let padded = match sig.sig {
         PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,

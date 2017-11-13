@@ -21,6 +21,7 @@ impl Digestable {
 
     // Like digest::Input
     pub fn process(&mut self, data: &[u8]) {
+        //println!("digest: {}", hex::encode(data));
         self.input().process(data)
     }
 
