@@ -27,6 +27,7 @@ pub enum SignatureType {
     PositiveCertificationUserId,
     SubkeyBinding,
     PrimaryKeyBinding,
+    SignatureDirectlyOnKey,
 }
 
 #[derive(Debug)]
@@ -124,7 +125,8 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         0x13 => SignatureType::PositiveCertificationUserId,
         0x18 => SignatureType::SubkeyBinding,
         0x19 => SignatureType::PrimaryKeyBinding,
-        other => bail!("not supported: signature type: {}", other),
+        0x1f => SignatureType::SignatureDirectlyOnKey,
+        other => bail!("not supported: signature type: {:02x}", other),
     };
 
     // https://tools.ietf.org/html/rfc4880#section-9.1
