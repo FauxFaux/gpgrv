@@ -1,5 +1,6 @@
 extern crate clap;
 extern crate gpgrv;
+extern crate iowrap;
 
 #[macro_use]
 extern crate error_chain;
@@ -46,7 +47,7 @@ fn run() -> Result<()> {
         gpgrv::verify_clearsign_armour(
             io::BufReader::new(fs::File::open(file)
                 .chain_err(|| format!("opening input file {:?}", file))?),
-            io::Cursor::new(vec![]),
+            iowrap::Ignore::new(),
             &keyring,
         ).chain_err(|| format!("verifying input file {:?}", file))?;
     }
