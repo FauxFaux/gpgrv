@@ -53,6 +53,9 @@ pub enum HashAlg {
     Sha256,
     Sha384,
     Sha512,
+
+    Md5,
+    RipeMd,
 }
 
 pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {

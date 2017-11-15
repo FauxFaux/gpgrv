@@ -27,6 +27,7 @@ enum PublicKeyAlg {
 pub enum SignatureType {
     CanonicalisedText,
     GenericCertificationUserId,
+    PersonaCertificationUserId,
     CasualCertificationUserId,
     PositiveCertificationUserId,
     SubkeyBinding,
@@ -149,52 +150,52 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
-    // this would not work for version 3 packets, which we're not processing,
-    // as their authenticated data section is different
-
-    let mut authenticated_data = Vec::with_capacity(32);
-    authenticated_data.resize(6, 0);
-    from.read_exact(&mut authenticated_data[0..6])?;
-
-    {
-        // https://tools.ietf.org/html/rfc4880#section-5.2.3
-        match authenticated_data[0] {
-            3 => bail!("not supported: version 3 signatures"),
-            4 => {}
-            other => bail!("not supported: unrecognised signature version: {}", other),
-        }
+    match from.read_u8()? {
+        3 => parse_signature_packet_v3(from).chain_err(|| "v3"),
+        4 => parse_signature_packet_v4(from).chain_err(|| "v4"),
+        other => bail!("not supported: unrecognised signature version: {}", other),
     }
+}
 
-    // https://tools.ietf.org/html/rfc4880#section-5.2.1
-    let sig_type = match authenticated_data[1] {
-        0x01 => SignatureType::CanonicalisedText,
-        0x10 => SignatureType::GenericCertificationUserId,
-        0x12 => SignatureType::CasualCertificationUserId,
-        0x13 => SignatureType::PositiveCertificationUserId,
-        0x18 => SignatureType::SubkeyBinding,
-        0x19 => SignatureType::PrimaryKeyBinding,
-        0x1f => SignatureType::SignatureDirectlyOnKey,
-        0x28 => SignatureType::SubkeyRevocationSignature,
-        0x30 => SignatureType::CertificationRevocationSignature,
-        other => bail!("not supported: signature type: 0x{:02x}", other),
-    };
+// https://tools.ietf.org/html/rfc4880#section-5.2.2
+fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature> {
+    ensure!(5 == from.read_u8()?, "invalid authenticated data length");
 
-    // https://tools.ietf.org/html/rfc4880#section-9.1
-    let key_alg = match authenticated_data[2] {
-        1 | 3 => PublicKeyAlg::Rsa,
-        17 => PublicKeyAlg::Dsa,
-        other => bail!("not supported: key algorithm: {}", other),
-    };
+    let mut authenticated_data = vec![0u8; 5];
+    from.read_exact(&mut authenticated_data)?;
 
-    // https://tools.ietf.org/html/rfc4880#section-9.4
-    let hash_alg = match authenticated_data[3] {
-        2 => HashAlg::Sha1,
-        8 => HashAlg::Sha256,
-        9 => HashAlg::Sha384,
-        10 => HashAlg::Sha512,
-        11 => HashAlg::Sha224,
-        other => bail!("not supported: hash algorithm: {}", other),
-    };
+    let sig_type = sig_type(authenticated_data[0])?;
+    // remaining authenticated_data: creation time
+
+    let mut issuer = [0u8; 8];
+    from.read_exact(&mut issuer)?;
+
+    let key_alg = key_alg(from.read_u8()?)?;
+    let hash_alg = hash_alg(from.read_u8()?)?;
+    let hash_hint = from.read_u16::<BigEndian>()?;
+
+    let sig = read_sig(from, key_alg)?;
+
+    Ok(Signature {
+        issuer: Some(issuer),
+        authenticated_data,
+        sig,
+        sig_type,
+        hash_hint,
+        hash_alg,
+    })
+}
+
+// https://tools.ietf.org/html/rfc4880#section-5.2.3
+fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature> {
+    let mut authenticated_data = Vec::with_capacity(32);
+    authenticated_data.push(4);
+    authenticated_data.resize(6, 0);
+    from.read_exact(&mut authenticated_data[1..6])?;
+
+    let sig_type = sig_type(authenticated_data[1])?;
+    let key_alg = key_alg(authenticated_data[2])?;
+    let hash_alg = hash_alg(authenticated_data[3])?;
 
     let good_subpackets_len = BigEndian::read_u16(&authenticated_data[4..6]);
     let good_subpackets_end = authenticated_data.len() + usize_from(good_subpackets_len);
@@ -208,13 +209,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
-    let sig = match key_alg {
-        PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
-        PublicKeyAlg::Dsa => PublicKeySig::Dsa {
-            r: read_mpi(&mut from)?,
-            s: read_mpi(&mut from)?,
-        },
-    };
+    let sig = read_sig(from, key_alg)?;
 
     Ok(Signature {
         issuer,
@@ -223,6 +218,56 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
         sig_type,
         hash_hint,
         hash_alg,
+    })
+}
+
+// https://tools.ietf.org/html/rfc4880#section-5.2.1
+fn sig_type(code: u8) -> Result<SignatureType> {
+    Ok(match code {
+        0x01 => SignatureType::CanonicalisedText,
+        0x10 => SignatureType::GenericCertificationUserId,
+        0x11 => SignatureType::PersonaCertificationUserId,
+        0x12 => SignatureType::CasualCertificationUserId,
+        0x13 => SignatureType::PositiveCertificationUserId,
+        0x18 => SignatureType::SubkeyBinding,
+        0x19 => SignatureType::PrimaryKeyBinding,
+        0x1f => SignatureType::SignatureDirectlyOnKey,
+        0x28 => SignatureType::SubkeyRevocationSignature,
+        0x30 => SignatureType::CertificationRevocationSignature,
+        other => bail!("not supported: signature type: 0x{:02x}", other),
+    })
+}
+
+// https://tools.ietf.org/html/rfc4880#section-9.1
+fn key_alg(code: u8) -> Result<PublicKeyAlg> {
+    Ok(match code {
+        1 | 3 => PublicKeyAlg::Rsa,
+        17 => PublicKeyAlg::Dsa,
+        other => bail!("not supported: key algorithm: {}", other),
+    })
+}
+
+// https://tools.ietf.org/html/rfc4880#section-9.4
+fn hash_alg(code: u8) -> Result<HashAlg> {
+    Ok(match code {
+        1 => HashAlg::Md5,
+        2 => HashAlg::Sha1,
+        3 => HashAlg::RipeMd,
+        8 => HashAlg::Sha256,
+        9 => HashAlg::Sha384,
+        10 => HashAlg::Sha512,
+        11 => HashAlg::Sha224,
+        other => bail!("not supported: hash algorithm: {}", other),
+    })
+}
+
+fn read_sig<R: Read>(mut from: R, key_alg: PublicKeyAlg) -> Result<PublicKeySig> {
+    Ok(match key_alg {
+        PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
+        PublicKeyAlg::Dsa => PublicKeySig::Dsa {
+            r: read_mpi(&mut from)?,
+            s: read_mpi(&mut from)?,
+        },
     })
 }
 
