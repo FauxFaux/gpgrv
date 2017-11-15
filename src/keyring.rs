@@ -11,6 +11,10 @@ use packets;
 use PubKey;
 
 pub struct Keyring {
+    /// Allows a (mathematical) key to have multiple ids.
+    /// This is the exact opposite to what all the users want, but is
+    /// the canonical way to store this data; we're deduplicating the
+    /// mathematical keys, and keeping all the ids around.
     keys: HashMultiMap<PubKey, u64>,
 }
 
