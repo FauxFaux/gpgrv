@@ -1,13 +1,20 @@
 extern crate clap;
 extern crate gpgrv;
 
+#[macro_use]
+extern crate error_chain;
+
+use errors::*;
+
 use std::fs;
 use std::io;
 
 use clap::App;
 use clap::Arg;
 
-fn main() {
+quick_main!(run);
+
+fn run() -> Result<()> {
     let matches = App::new("gpgv")
         .arg(
             Arg::with_name("keyring")
@@ -30,14 +37,30 @@ fn main() {
     let mut keyring = gpgrv::Keyring::new();
     for path in matches.values_of_os("keyring").unwrap() {
         keyring
-            .append_keys_from(fs::File::open(path).expect("can't open keyring"))
-            .expect("can't open keyring");
+            .append_keys_from(fs::File::open(path)
+                .chain_err(|| format!("opening keyring {:?}", path))?)
+            .chain_err(|| format!("reading keyring {:?}", path))?;
     }
 
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_clearsign_armour(
-            io::BufReader::new(fs::File::open(file).expect("can't open input file")),
+            io::BufReader::new(fs::File::open(file)
+                .chain_err(|| format!("opening input file {:?}", file))?),
             &keyring,
-        ).expect("verification problem");
+        ).chain_err(|| format!("verifying input file {:?}", file))?;
+    }
+
+    Ok(())
+}
+
+mod errors {
+    error_chain! {
+        links {
+            Gpgrv(::gpgrv::Error, ::gpgrv::ErrorKind);
+        }
+
+        foreign_links {
+            Io(::std::io::Error);
+        }
     }
 }
