@@ -23,7 +23,11 @@ impl Keyring {
         let mut last = None;
         loop {
             match packets::parse_packet(&mut reader).chain_err(|| {
-                format!("parsing after after {:?} at around {}", last, reader.position())
+                format!(
+                    "parsing after after {:?} at around {}",
+                    last,
+                    reader.position()
+                )
             })? {
                 Some(packets::Packet::PubKey(key)) => {
                     last = Some(key.identity());

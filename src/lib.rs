@@ -38,7 +38,12 @@ pub enum PubKey {
     Ecdsa { oid: Vec<u8>, point: Vec<u8> },
     Ed25519 { oid: Vec<u8>, point: Vec<u8> },
     Elgaml { p: Vec<u8>, g: Vec<u8>, y: Vec<u8> },
-    Dsa { p: Vec<u8>, q: Vec<u8>, g: Vec<u8>, y: Vec<u8> },
+    Dsa {
+        p: Vec<u8>,
+        q: Vec<u8>,
+        g: Vec<u8>,
+        y: Vec<u8>,
+    },
 }
 
 #[derive(Debug)]

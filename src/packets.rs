@@ -252,19 +252,13 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
             g: read_mpi(&mut from)?,
             y: read_mpi(&mut from)?,
         },
-        19 => {
-            // https://tools.ietf.org/html/rfc6637#section-9
-            PubKey::Ecdsa {
-                oid: read_oid(&mut from)?,
-                point: read_mpi(&mut from)?,
-            }
+        19 => PubKey::Ecdsa {
+            oid: read_oid(&mut from)?,
+            point: read_mpi(&mut from)?,
         },
-        22 => {
-            // ??
-            PubKey::Ed25519 {
-                oid: read_oid(&mut from)?,
-                point: read_mpi(&mut from)?,
-            }
+        22 => PubKey::Ed25519 {
+            oid: read_oid(&mut from)?,
+            point: read_mpi(&mut from)?,
         },
         other => bail!("not supported: unrecognised key type: {}", other),
     };
