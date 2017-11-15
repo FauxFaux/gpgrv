@@ -4,11 +4,12 @@ name = "gpgrv"
 version = "0.1.0"
 
 [dependencies]
-base64 = "0.7"
-byteorder = "1.1"
+base64 = "0"
+byteorder = "1"
 digest = "0.6"
 error-chain = "0.11"
 hex = "0.3"
+iowrap = "0"
 sha2 = "0.6"
 
 [dependencies.num]

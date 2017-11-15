@@ -5,6 +5,7 @@ extern crate digest;
 #[macro_use]
 extern crate error_chain;
 extern crate hex;
+extern crate iowrap;
 extern crate num;
 extern crate sha2;
 extern crate sha_1;
