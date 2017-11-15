@@ -63,7 +63,7 @@ pub enum Packet {
 impl PubKeyPacket {
     pub fn fingerprint(&self) -> Option<[u8; 20]> {
         let (alg, len) = match self.math {
-            PubKey::Rsa { ref n, ref e } => (1, 2 + 2 + n.len() + e.len()),
+            PubKey::Rsa { ref n, ref e } => (1u8, 2 + 2 + n.len() + e.len()),
             _ => return None,
         };
 
@@ -389,9 +389,32 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+fn top_bit(val: u8) -> u8 {
+    for i in (0..8).rev() {
+        if val >= (1 << i) {
+            return i;
+        }
+    }
+
+    panic!()
+}
+
 fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
     assert!(mpi.len() < 8192);
-    digest.process(&to_be_u16(mpi.len() * 8));
+
+    if mpi.is_empty() {
+        // zero length, no data
+        digest.process(&[0, 0]);
+        return;
+    }
+
+    let first_byte = mpi[0];
+    assert_ne!(0, first_byte, "invalid mpi: zero prefix");
+    let bytes_len = (mpi.len() - 1) * 8;
+    let bits_len = 1 + usize::from(top_bit(first_byte));
+    let total_len = bytes_len + bits_len;
+
+    digest.process(&to_be_u16(total_len));
     digest.process(mpi);
 }
 
@@ -441,5 +464,17 @@ mod tests {
         assert!(read_mpi(Cursor::new(vec![0, 1, 0b0001_0001])).is_err());
         assert!(read_mpi(Cursor::new(vec![0, 1, 0b1000_0001])).is_err());
         assert!(read_mpi(Cursor::new(vec![0, 2, 0b0000_1010])).is_err());
+    }
+
+    #[test]
+    fn bit() {
+        use super::top_bit;
+        assert_eq!(0, top_bit(1));
+        assert_eq!(1, top_bit(2));
+        assert_eq!(1, top_bit(3));
+        assert_eq!(2, top_bit(4));
+        assert_eq!(6, top_bit(126));
+        assert_eq!(6, top_bit(127));
+        assert_eq!(7, top_bit(128));
     }
 }
