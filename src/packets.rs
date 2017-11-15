@@ -246,21 +246,26 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
             g: read_mpi(&mut from)?,
             y: read_mpi(&mut from)?,
         },
+        17 => PubKey::Dsa {
+            p: read_mpi(&mut from)?,
+            q: read_mpi(&mut from)?,
+            g: read_mpi(&mut from)?,
+            y: read_mpi(&mut from)?,
+        },
         19 => {
             // https://tools.ietf.org/html/rfc6637#section-9
-            let oid_len = from.read_u8()?;
-            ensure!(
-                0 != oid_len && 0xff != oid_len,
-                "reserved ecdsa oid lengths"
-            );
-            let mut oid = vec![0u8; usize::from(oid_len)];
-            from.read_exact(&mut oid)?;
-
             PubKey::Ecdsa {
-                oid,
+                oid: read_oid(&mut from)?,
                 point: read_mpi(&mut from)?,
             }
-        }
+        },
+        22 => {
+            // ??
+            PubKey::Ed25519 {
+                oid: read_oid(&mut from)?,
+                point: read_mpi(&mut from)?,
+            }
+        },
         other => bail!("not supported: unrecognised key type: {}", other),
     };
 
@@ -269,6 +274,18 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
         creation_time,
         math,
     })
+}
+
+// https://tools.ietf.org/html/rfc6637#section-9
+fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>> {
+    let oid_len = from.read_u8()?;
+    ensure!(
+        0 != oid_len && 0xff != oid_len,
+        "reserved ecdsa oid lengths"
+    );
+    let mut oid = vec![0u8; usize::from(oid_len)];
+    from.read_exact(&mut oid)?;
+    Ok(oid)
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.4.1
