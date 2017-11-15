@@ -6,8 +6,8 @@ extern crate digest;
 extern crate error_chain;
 extern crate hex;
 extern crate num;
-extern crate sha_1;
 extern crate sha2;
+extern crate sha_1;
 
 mod armour;
 mod digestable;
@@ -49,12 +49,10 @@ pub enum HashAlg {
 
 pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {
     match key {
-        &PubKey::Rsa { ref n, ref e } => {
-            match sig {
-                &PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
-                _ => bail!("key/signature type mismatch"),
-            }
-        }
+        &PubKey::Rsa { ref n, ref e } => match sig {
+            &PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
+            _ => bail!("key/signature type mismatch"),
+        },
         &PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
         &PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
     }

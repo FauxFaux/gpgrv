@@ -18,9 +18,15 @@ impl Keyring {
     pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize> {
         let mut reader = io::BufReader::new(reader);
         let mut read = 0;
+        let mut last = None;
         loop {
-            match packets::parse_packet(&mut reader)? {
-                Some(packets::Packet::PubKey(key)) => self.keys.push(key),
+            match packets::parse_packet(&mut reader)
+                .chain_err(|| format!("parsing after after {:?}", last))?
+            {
+                Some(packets::Packet::PubKey(key)) => {
+                    last = Some(key.identity());
+                    self.keys.push(key.math);
+                }
                 Some(packets::Packet::IgnoredJunk) => continue,
                 Some(packets::Packet::Signature(_)) => continue,
                 None => break,

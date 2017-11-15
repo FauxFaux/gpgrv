@@ -20,9 +20,9 @@ pub struct Signature {
 
 pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
     let mut lines = from.lines();
-    let first = lines.next().ok_or(
-        "unexpected EOF looking for begin marker",
-    )??;
+    let first = lines
+        .next()
+        .ok_or("unexpected EOF looking for begin marker")??;
     ensure!(
         first == BEGIN_SIGNED,
         "first line must be {}, not {:?}",
@@ -80,7 +80,6 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
 
         // checksum
         if line.len() == 5 && line.starts_with('=') {
-
             // TODO: Validate checksum? It's not part of the security model in any way.
 
             let line = lines.next().ok_or("unexpected EOF reading tail")??;
@@ -118,9 +117,9 @@ fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, Stri
             break;
         }
 
-        let (key, colon_value) = header.split_at(header.find(": ").ok_or_else(|| {
-            format!("header {:?} must contain a colon space", header)
-        })?);
+        let (key, colon_value) = header.split_at(header
+            .find(": ")
+            .ok_or_else(|| format!("header {:?} must contain a colon space", header))?);
 
         headers.insert(key.to_string(), colon_value[2..].to_string());
     }

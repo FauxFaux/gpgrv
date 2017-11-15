@@ -31,11 +31,9 @@ fn packets_sig() {
 fn packets_key() {
     use gpgrv::Packet::*;
     match gpgrv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
-        Some(PubKey(key)) => {
-            match key {
-                _ => {}
-            }
-        }
+        Some(PubKey(key)) => match key {
+            _ => {}
+        },
         _ => panic!("wrong type of/missing packet"),
     }
 }

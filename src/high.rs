@@ -41,7 +41,6 @@ pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result
             sig.hash_hint,
             actual,
         );
-
     }
 
     let padded = match sig.sig {

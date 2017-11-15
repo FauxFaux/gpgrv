@@ -1,10 +1,14 @@
 use std::io;
 use std::io::Read;
+use std::u16;
 use std::u32;
 
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
+
+use digest::Digest;
+use hex;
 
 use HashAlg;
 use PublicKeySig;
@@ -43,10 +47,51 @@ pub struct Signature {
 }
 
 #[derive(Debug)]
+pub struct PubKeyPacket {
+    version: u8,
+    creation_time: u32,
+    pub math: PubKey,
+}
+
+#[derive(Debug)]
 pub enum Packet {
     IgnoredJunk,
-    PubKey(PubKey),
+    PubKey(PubKeyPacket),
     Signature(Signature),
+}
+
+impl PubKeyPacket {
+    pub fn fingerprint(&self) -> Option<[u8; 20]> {
+        let (alg, len) = match self.math {
+            PubKey::Rsa { ref n, ref e } => (1, 2 + 2 + n.len() + e.len()),
+            _ => return None,
+        };
+
+        // https://tools.ietf.org/html/rfc4880#section-12.2
+
+        let mut digest = ::sha_1::Sha1::default();
+        digest.input(&[0x99]);
+        digest.input(&to_be_u16(1 + 4 + 1 + len));
+        digest.input(&[self.version]);
+        digest.input(&be_u32(self.creation_time));
+        digest.input(&[alg]);
+        match self.math {
+            PubKey::Rsa { ref n, ref e } => {
+                digest_mpi(digest, n);
+                digest_mpi(digest, e);
+            }
+            _ => unreachable!(),
+        }
+
+        Some(digest.hash())
+    }
+
+    pub fn identity(&self) -> String {
+        match self.fingerprint() {
+            Some(fingerprint) => hex::encode(&fingerprint[12..]),
+            None => "[unsupported key type]".to_string(),
+        }
+    }
 }
 
 pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
@@ -81,7 +126,8 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
     let mut from = from.take(u64::from(len));
 
     let parsed = match tag {
-        2 => Packet::Signature(parse_signature_packet(&mut from)?),
+        2 => Packet::Signature(parse_signature_packet(&mut from)
+            .chain_err(|| "parsing signature")?),
         // 6: public key
         // 14: public subkey
         6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
@@ -157,18 +203,17 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
 
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
-    let issuer = find_issuer(&bad_subpackets)?;
+    let issuer = find_issuer(&bad_subpackets)
+        .chain_err(|| "reading unsigned subpackets to determine issuer")?;
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
     let sig = match key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
-        PublicKeyAlg::Dsa => {
-            PublicKeySig::Dsa {
-                r: read_mpi(&mut from)?,
-                s: read_mpi(&mut from)?,
-            }
-        }
+        PublicKeyAlg::Dsa => PublicKeySig::Dsa {
+            r: read_mpi(&mut from)?,
+            s: read_mpi(&mut from)?,
+        },
     };
 
     Ok(Signature {
@@ -181,7 +226,7 @@ fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
     })
 }
 
-fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKey> {
+fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
     // https://tools.ietf.org/html/rfc4880#section-5.5.2
     match from.read_u8()? {
         3 => bail!("not supported: version 3 key packets"),
@@ -189,9 +234,9 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKey> {
         other => bail!("not supported: unrecognised key packet version: {}", other),
     }
 
-    from.read_u32::<BigEndian>()?; // time
+    let creation_time = from.read_u32::<BigEndian>()?;
 
-    Ok(match from.read_u8()? {
+    let math = match from.read_u8()? {
         1 => PubKey::Rsa {
             n: read_mpi(&mut from)?,
             e: read_mpi(&mut from)?,
@@ -204,16 +249,25 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKey> {
         19 => {
             // https://tools.ietf.org/html/rfc6637#section-9
             let oid_len = from.read_u8()?;
-            ensure!(0 != oid_len && 0xff != oid_len, "reserved ecdsa oid lengths");
+            ensure!(
+                0 != oid_len && 0xff != oid_len,
+                "reserved ecdsa oid lengths"
+            );
             let mut oid = vec![0u8; usize::from(oid_len)];
             from.read_exact(&mut oid)?;
 
             PubKey::Ecdsa {
                 oid,
-                point: read_mpi(&mut from)?
+                point: read_mpi(&mut from)?,
             }
-        },
+        }
         other => bail!("not supported: unrecognised key type: {}", other),
+    };
+
+    Ok(PubKeyPacket {
+        version: 4,
+        creation_time,
+        math,
     })
 }
 
@@ -223,7 +277,7 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
 
     for (id, data) in parse_subpackets(&subpackets)? {
         if is_bit_set(id, 7) {
-            bail!("unsupported critical subpacket: {}", id);
+            bail!("unsupported critical subpacket: {}", id & 0b0111_1111);
         }
 
         match id {
@@ -333,6 +387,25 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
     );
 
     Ok(data)
+}
+
+fn digest_mpi<D: Digest>(mut digest: D, mpi: &[u8]) {
+    assert!(mpi.len() < 8192);
+    digest.process(&to_be_u16(mpi.len() / 8));
+    digest.process(mpi);
+}
+
+fn to_be_u16(val: usize) -> [u8; 2] {
+    assert!(val <= u16::MAX as usize, "value too big for u16");
+    let mut ret = [0u8; 2];
+    BigEndian::write_u16(&mut ret[..], val as u16);
+    ret
+}
+
+fn be_u32(val: u32) -> [u8; 4] {
+    let mut ret = [0u8; 4];
+    BigEndian::write_u32(&mut ret[..], val);
+    ret
 }
 
 /// Check if a 0-indexed bit, counted in the traditional way, is set.
