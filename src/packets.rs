@@ -77,8 +77,8 @@ impl PubKeyPacket {
         digest.input(&[alg]);
         match self.math {
             PubKey::Rsa { ref n, ref e } => {
-                digest_mpi(digest, n);
-                digest_mpi(digest, e);
+                digest_mpi(&mut digest, n);
+                digest_mpi(&mut digest, e);
             }
             _ => unreachable!(),
         }
@@ -389,9 +389,9 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-fn digest_mpi<D: Digest>(mut digest: D, mpi: &[u8]) {
+fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
     assert!(mpi.len() < 8192);
-    digest.process(&to_be_u16(mpi.len() / 8));
+    digest.process(&to_be_u16(mpi.len() * 8));
     digest.process(mpi);
 }
 
