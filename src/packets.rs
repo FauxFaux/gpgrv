@@ -337,7 +337,7 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>> {
         ensure!(data.len() >= data_start, "illegal super-short subpacket");
         ensure!(data_end <= data.len(), "packet extends outside field");
 
-        let id = data[1];
+        let id = data[len_len];
         ret.push((id, &data[data_start..data_end]));
 
         data = &data[data_end..];
