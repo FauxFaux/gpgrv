@@ -8,7 +8,6 @@ use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 
 use digest::Digest;
-use hex;
 
 use HashAlg;
 use PublicKeySig;
@@ -179,7 +178,7 @@ fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature> {
     let hash_alg = hash_alg(from.read_u8()?)?;
     let hash_hint = from.read_u16::<BigEndian>()?;
 
-    let sig = read_sig(from, key_alg)?;
+    let sig = read_sig(from, &key_alg)?;
 
     Ok(Signature {
         issuer: Some(issuer),
@@ -214,7 +213,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature> {
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
-    let sig = read_sig(from, key_alg)?;
+    let sig = read_sig(from, &key_alg)?;
 
     Ok(Signature {
         issuer,
@@ -266,8 +265,8 @@ fn hash_alg(code: u8) -> Result<HashAlg> {
     })
 }
 
-fn read_sig<R: Read>(mut from: R, key_alg: PublicKeyAlg) -> Result<PublicKeySig> {
-    Ok(match key_alg {
+fn read_sig<R: Read>(mut from: R, key_alg: &PublicKeyAlg) -> Result<PublicKeySig> {
+    Ok(match *key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
         PublicKeyAlg::Dsa => PublicKeySig::Dsa {
             r: read_mpi(&mut from)?,
@@ -336,7 +335,7 @@ fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>> {
 fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
     let mut issuer = None;
 
-    for (id, data) in parse_subpackets(&subpackets)? {
+    for (id, data) in parse_subpackets(subpackets)? {
         if is_bit_set(id, 7) {
             bail!("unsupported critical subpacket: {}", id & 0b0111_1111);
         }
@@ -359,7 +358,7 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
         }
     }
 
-    return Ok(issuer);
+    Ok(issuer)
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.3.1
@@ -414,7 +413,7 @@ fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-/// https://tools.ietf.org/html/rfc4880#section-3.2
+/// <https://tools.ietf.org/html/rfc4880#section-3.2>
 fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
     let bits: u16 = from.read_u16::<BigEndian>()?;
     if 0 == bits {

@@ -17,10 +17,7 @@ impl<K: Eq + Hash, V: Eq + Hash> HashMultiMap<K, V> {
     }
 
     pub fn insert(&mut self, k: K, v: V) -> bool {
-        self.inner
-            .entry(k)
-            .or_insert_with(|| HashSet::new())
-            .insert(v)
+        self.inner.entry(k).or_insert_with(HashSet::new).insert(v)
     }
 
     pub fn entries(&self) -> Entries<K, V> {

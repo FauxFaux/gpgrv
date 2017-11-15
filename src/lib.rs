@@ -60,29 +60,29 @@ pub enum HashAlg {
 }
 
 pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {
-    match key {
-        &PubKey::Rsa { ref n, ref e } => match sig {
-            &PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
+    match *key {
+        PubKey::Rsa { ref n, ref e } => match *sig {
+            PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
             _ => bail!("key/signature type mismatch"),
         },
-        &PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
-        &PubKey::Ed25519 { .. } => bail!("not implemented: verify ed25519 signatures"),
-        &PubKey::Dsa { .. } => bail!("not implemented: verify dsa signatures"),
-        &PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
+        PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
+        PubKey::Ed25519 { .. } => bail!("not implemented: verify ed25519 signatures"),
+        PubKey::Dsa { .. } => bail!("not implemented: verify dsa signatures"),
+        PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
     }
 }
 
-/// https://github.com/rust-lang/rust/issues/44290
+/// <https://github.com/rust-lang/rust/issues/44290>
 fn usize_from(val: u16) -> usize {
     val as usize
 }
 
 fn usize_from_u32(val: u32) -> usize {
-    assert!((val as u64) <= (std::usize::MAX as u64));
+    assert!(u64::from(val) <= (std::usize::MAX as u64));
     val as usize
 }
 
 fn to_u32(val: usize) -> u32 {
-    assert!((val as u64) <= (std::u32::MAX as u64));
+    assert!((val as u64) <= u64::from(std::u32::MAX));
     val as u32
 }

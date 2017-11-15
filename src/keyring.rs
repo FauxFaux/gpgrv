@@ -42,8 +42,9 @@ impl Keyring {
                     let identity = key.identity().unwrap_or(0);
                     self.keys.insert(key.math, identity);
                 }
-                Some(packets::Packet::IgnoredJunk) => continue,
-                Some(packets::Packet::Signature(_)) => continue,
+                Some(packets::Packet::IgnoredJunk) | Some(packets::Packet::Signature(_)) => {
+                    continue
+                }
                 None => break,
                 other => bail!("unexpected packet in keyring: {:?}", other),
             }
@@ -63,5 +64,11 @@ impl Keyring {
         }
 
         ret
+    }
+}
+
+impl Default for Keyring {
+    fn default() -> Self {
+        Keyring::new()
     }
 }
