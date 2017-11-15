@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::Lines;
+use std::io::Write;
 
 use base64;
 
@@ -18,7 +19,7 @@ pub struct Signature {
     pub signature: Vec<u8>,
 }
 
-pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
+pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Result<Signature> {
     let mut lines = from.lines();
     let first = lines
         .next()
@@ -63,10 +64,12 @@ pub fn parse_clearsign_armour<R: BufRead>(from: R) -> Result<Signature> {
         // we don't want a trailing newline, apparently,
         // even though it's always there in the message
         if !first {
+            to.write_all(b"\r\n")?;
             digest.process(b"\r\n");
         }
         first = false;
 
+        to.write_all(line.as_bytes())?;
         digest.process(line.as_bytes());
     }
 

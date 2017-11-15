@@ -46,6 +46,7 @@ fn run() -> Result<()> {
         gpgrv::verify_clearsign_armour(
             io::BufReader::new(fs::File::open(file)
                 .chain_err(|| format!("opening input file {:?}", file))?),
+            io::Cursor::new(vec![]),
             &keyring,
         ).chain_err(|| format!("verifying input file {:?}", file))?;
     }

@@ -21,6 +21,8 @@ features = ["generic"]
 version = "0.4"
 
 [dev-dependencies]
-clap = "2.27"
+clap = "2"
+tempfile = "2"
+
 [profile.release]
 lto = true

@@ -1,5 +1,6 @@
 use std::io;
 use std::io::BufRead;
+use std::io::Write;
 
 use byteorder::ByteOrder;
 use byteorder::BigEndian;
@@ -13,8 +14,32 @@ use errors::*;
 use PublicKeySig;
 use to_u32;
 
-pub fn verify_clearsign_armour<R: BufRead>(from: R, keyring: &Keyring) -> Result<()> {
-    let mut armour_removed = armour::parse_clearsign_armour(from)?;
+/// Verify the data in a clearsigned armour stream
+///
+/// Note that some data may be written out before the signature is verified,
+/// and you must not process this until the method has returned success.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// extern crate tempfile;
+/// extern crate gpgrv;
+/// use std::io::{stdin, stdout, BufReader, Seek, SeekFrom};
+///
+/// fn check_stdin(keyring: &gpgrv::Keyring) {
+///     let mut temp = tempfile::tempfile().unwrap();
+///     gpgrv::verify_clearsign_armour(BufReader::new(stdin()), &mut temp, keyring)
+///         .expect("verification");
+///     temp.seek(SeekFrom::Start(0)).unwrap();
+///     std::io::copy(&mut temp, &mut stdout()).unwrap();
+/// }
+/// ```
+pub fn verify_clearsign_armour<R: BufRead, W: Write>(
+    from: R,
+    to: W,
+    keyring: &Keyring,
+) -> Result<()> {
+    let mut armour_removed = armour::parse_clearsign_armour(from, io::BufWriter::new(to))?;
     let sig_packets = io::Cursor::new(armour_removed.signature);
     let sig = match packets::parse_packet(sig_packets)? {
         Some(packets::Packet::Signature(s)) => s,

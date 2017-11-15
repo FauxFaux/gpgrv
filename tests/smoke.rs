@@ -8,14 +8,21 @@ const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
 
 #[test]
 fn split() {
-    gpgrv::parse_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes())).unwrap();
+    gpgrv::parse_clearsign_armour(
+        io::Cursor::new(HELLO_WORLD.as_bytes()),
+        io::Cursor::new(vec![]),
+    ).unwrap();
 }
 
 #[test]
 fn verify() {
     let mut keyring = gpgrv::Keyring::new();
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
-    gpgrv::verify_clearsign_armour(io::Cursor::new(HELLO_WORLD.as_bytes()), &keyring).unwrap();
+    gpgrv::verify_clearsign_armour(
+        io::Cursor::new(HELLO_WORLD.as_bytes()),
+        io::Cursor::new(vec![]),
+        &keyring,
+    ).unwrap();
 }
 
 #[test]
