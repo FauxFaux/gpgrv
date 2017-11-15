@@ -80,7 +80,7 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
         }
     }
 
-    bail!("no known keys could validate the signature");
+    Err("no known keys could validate the signature".into())
 }
 
 fn make_tail(len: usize) -> [u8; 6] {
