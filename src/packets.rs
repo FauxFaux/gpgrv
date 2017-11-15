@@ -87,9 +87,14 @@ impl PubKeyPacket {
         Some(digest.hash())
     }
 
-    pub fn identity(&self) -> String {
-        match self.fingerprint() {
-            Some(fingerprint) => hex::encode(&fingerprint[12..]),
+    pub fn identity(&self) -> Option<u64> {
+        self.fingerprint().map(|x| BigEndian::read_u64(&x[12..]))
+    }
+
+    pub fn identity_hex(&self) -> String {
+        match self.identity() {
+            // TODO: does this endian correctly?
+            Some(identity) => format!("{:08x}", identity),
             None => "[unsupported key type]".to_string(),
         }
     }

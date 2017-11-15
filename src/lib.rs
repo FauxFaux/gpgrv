@@ -13,6 +13,7 @@ extern crate sha_1;
 mod armour;
 mod digestable;
 mod errors;
+mod hash_multimap;
 mod high;
 mod keyring;
 mod mpi;
@@ -32,7 +33,7 @@ pub enum PublicKeySig {
     Dsa { r: Vec<u8>, s: Vec<u8> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum PubKey {
     Rsa { n: Vec<u8>, e: Vec<u8> },
     Ecdsa { oid: Vec<u8>, point: Vec<u8> },

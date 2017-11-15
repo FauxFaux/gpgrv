@@ -40,7 +40,7 @@ fn packets_key() {
     match gpgrv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
         Some(PubKey(key)) => match key {
             _ => {
-                assert_eq!("b195e1c4779ba9b2", key.identity());
+                assert_eq!("b195e1c4779ba9b2", key.identity_hex());
             }
         },
         _ => panic!("wrong type of/missing packet"),

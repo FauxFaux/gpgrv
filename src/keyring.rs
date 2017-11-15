@@ -1,6 +1,8 @@
 use std::io;
 use std::io::Read;
 
+use hash_multimap::HashMultiMap;
+
 use iowrap;
 
 use errors::*;
@@ -9,12 +11,14 @@ use packets;
 use PubKey;
 
 pub struct Keyring {
-    keys: Vec<PubKey>,
+    keys: HashMultiMap<PubKey, u64>,
 }
 
 impl Keyring {
     pub fn new() -> Self {
-        Keyring { keys: Vec::new() }
+        Keyring {
+            keys: HashMultiMap::new(),
+        }
     }
 
     pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize> {
@@ -30,8 +34,9 @@ impl Keyring {
                 )
             })? {
                 Some(packets::Packet::PubKey(key)) => {
-                    last = Some(key.identity());
-                    self.keys.push(key.math);
+                    last = Some(key.identity_hex());
+                    let identity = key.identity().unwrap_or(0);
+                    self.keys.insert(key.math, identity);
                 }
                 Some(packets::Packet::IgnoredJunk) => continue,
                 Some(packets::Packet::Signature(_)) => continue,
@@ -45,7 +50,14 @@ impl Keyring {
         Ok(read)
     }
 
-    pub fn as_slice(&self) -> &[PubKey] {
-        &self.keys
+    pub fn keys_with_id(&self, id: u64) -> Vec<&PubKey> {
+        let mut ret = Vec::new();
+        for (key, key_id) in self.keys.entries() {
+            if id == *key_id {
+                ret.push(key);
+            }
+        }
+
+        ret
     }
 }

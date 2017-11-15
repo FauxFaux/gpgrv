@@ -74,7 +74,7 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
     };
 
 
-    for key in keyring.as_slice() {
+    for key in keyring.keys_with_id(BigEndian::read_u64(&sig.issuer.ok_or("missing issuer")?)) {
         if ::verify(key, &sig.sig, &padded).is_ok() {
             return Ok(());
         }
