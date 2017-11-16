@@ -10,6 +10,18 @@ pub enum Digestable {
 }
 
 impl Digestable {
+    pub fn sha1() -> Digestable {
+        Digestable::Sha1(::sha_1::Sha1::default())
+    }
+
+    pub fn sha256() -> Digestable {
+        Digestable::Sha256(::sha2::Sha256::default())
+    }
+
+    pub fn sha512() -> Digestable {
+        Digestable::Sha512(::sha2::Sha512::default())
+    }
+
     pub fn input(&mut self) -> &mut Input {
         use self::Digestable::*;
         match *self {

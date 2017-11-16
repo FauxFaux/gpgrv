@@ -34,9 +34,9 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Resul
     let body_headers = take_headers(&mut lines)?;
 
     let mut digest = match body_headers.get("Hash").map(|x| x.as_str()) {
-        Some("SHA1") => Digestable::Sha1(::sha_1::Sha1::default()),
-        Some("SHA256") => Digestable::Sha256(::sha2::Sha256::default()),
-        Some("SHA512") => Digestable::Sha512(::sha2::Sha512::default()),
+        Some("SHA1") => Digestable::sha1(),
+        Some("SHA256") => Digestable::sha256(),
+        Some("SHA512") => Digestable::sha512(),
         Some(other) => bail!("unsupported Hash header: {:?}", other),
         None => bail!("'Hash' header is mandatory"),
     };
