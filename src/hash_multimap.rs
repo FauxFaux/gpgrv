@@ -1,5 +1,3 @@
-use std::collections::hash_map;
-use std::collections::hash_set;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -20,41 +18,8 @@ impl<K: Eq + Hash, V: Eq + Hash> HashMultiMap<K, V> {
         self.inner.entry(k).or_insert_with(HashSet::new).insert(v)
     }
 
-    pub fn entries(&self) -> Entries<K, V> {
-        Entries {
-            outer_iter: self.inner.iter(),
-            inner_iter: None,
-        }
-    }
-}
-
-pub struct Entries<'h, K: 'h, V: 'h> {
-    outer_iter: hash_map::Iter<'h, K, HashSet<V>>,
-    inner_iter: Option<(&'h K, hash_set::Iter<'h, V>)>,
-}
-
-impl<'h, K, V: Eq + Hash> Iterator for Entries<'h, K, V> {
-    type Item = (&'h K, &'h V);
-
-    // This looks terrible, I must be being dumb...
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.inner_iter.is_none() {
-                self.inner_iter = match self.outer_iter.next() {
-                    Some((k, v)) => Some((k, v.iter())),
-                    None => return None,
-                };
-            }
-
-            {
-                let &mut (k, ref mut it) = self.inner_iter.as_mut().unwrap();
-                if let Some(v) = it.next() {
-                    return Some((k, v));
-                }
-            }
-
-            self.inner_iter = None;
-        }
+    pub fn entries<'h>(&'h self) -> Box<Iterator<Item=(&'h K, &'h V)> + 'h> {
+        Box::new(self.inner.iter().flat_map(|(k, v)| v.iter().map(move |v| (k, v))))
     }
 }
 
