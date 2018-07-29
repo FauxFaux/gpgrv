@@ -5,6 +5,7 @@ categories = [
     "cryptography",
     "parsing",
 ]
+description = "Pure-Rust implementation of gpgv, to verify gpg signatures"
 name = "gpgrv"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
