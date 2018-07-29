@@ -1,7 +1,8 @@
-use errors::*;
+use failure::Error;
+
 use mpi;
 
-pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<()> {
+pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<(), Error> {
     if sig.len() < (2048 / 8) {
         bail!("signature too short");
     }
@@ -12,5 +13,5 @@ pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<
         return Ok(());
     }
 
-    Err("signatures don't match".into())
+    bail!("signatures don't match")
 }

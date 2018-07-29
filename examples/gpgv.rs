@@ -3,19 +3,17 @@ extern crate gpgrv;
 extern crate iowrap;
 
 #[macro_use]
-extern crate error_chain;
-
-use errors::*;
+extern crate failure;
 
 use std::fs;
 use std::io;
 
 use clap::App;
 use clap::Arg;
+use failure::Error;
+use failure::ResultExt;
 
-quick_main!(run);
-
-fn run() -> Result<()> {
+fn main() -> Result<(), Error> {
     let matches = App::new("gpgv")
         .arg(
             Arg::with_name("keyring")
@@ -39,32 +37,21 @@ fn run() -> Result<()> {
     for path in matches.values_of_os("keyring").unwrap() {
         keyring
             .append_keys_from(
-                fs::File::open(path).chain_err(|| format!("opening keyring {:?}", path))?,
+                fs::File::open(path).with_context(|_| format_err!("opening keyring {:?}", path))?,
             )
-            .chain_err(|| format!("reading keyring {:?}", path))?;
+            .with_context(|_| format!("reading keyring {:?}", path))?;
     }
 
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_clearsign_armour(
             io::BufReader::new(
-                fs::File::open(file).chain_err(|| format!("opening input file {:?}", file))?,
+                fs::File::open(file)
+                    .with_context(|_| format_err!("opening input file {:?}", file))?,
             ),
             iowrap::Ignore::new(),
             &keyring,
-        ).chain_err(|| format!("verifying input file {:?}", file))?;
+        ).with_context(|_| format_err!("verifying input file {:?}", file))?;
     }
 
     Ok(())
-}
-
-mod errors {
-    error_chain! {
-        links {
-            Gpgrv(::gpgrv::Error, ::gpgrv::ErrorKind);
-        }
-
-        foreign_links {
-            Io(::std::io::Error);
-        }
-    }
 }

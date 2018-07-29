@@ -3,7 +3,7 @@ extern crate byteorder;
 extern crate digest;
 
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate hex;
 extern crate iowrap;
 extern crate num;
@@ -12,7 +12,6 @@ extern crate sha2;
 
 mod armour;
 mod digestable;
-mod errors;
 mod hash_multimap;
 mod high;
 mod keyring;
@@ -20,8 +19,9 @@ mod mpi;
 mod packets;
 mod rsa;
 
+use failure::Error;
+
 pub use armour::parse_clearsign_armour;
-pub use errors::*;
 pub use high::verify_clearsign_armour;
 pub use keyring::Keyring;
 pub use packets::parse_packet;
@@ -72,7 +72,7 @@ pub enum HashAlg {
     RipeMd,
 }
 
-pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()> {
+pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<(), Error> {
     match *key {
         PubKey::Rsa { ref n, ref e } => match *sig {
             PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),

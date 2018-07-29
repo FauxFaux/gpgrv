@@ -4,9 +4,9 @@ use std::io::Lines;
 use std::io::Write;
 
 use digestable::Digestable;
+use failure::Error;
 
 use base64;
-use errors::*;
 
 const BEGIN_SIGNED: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
@@ -19,11 +19,14 @@ pub struct Signature {
     pub signature: Vec<u8>,
 }
 
-pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Result<Signature> {
+pub fn parse_clearsign_armour<R: BufRead, W: Write>(
+    from: R,
+    mut to: W,
+) -> Result<Signature, Error> {
     let mut lines = from.lines();
     let first = lines
         .next()
-        .ok_or("unexpected EOF looking for begin marker")??;
+        .ok_or_else(|| format_err!("unexpected EOF looking for begin marker"))??;
     ensure!(
         first == BEGIN_SIGNED,
         "first line must be {}, not {:?}",
@@ -44,7 +47,9 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Resul
     let mut first = true;
 
     loop {
-        let line = lines.next().ok_or("unexpected EOF looking for signature")??;
+        let line = lines
+            .next()
+            .ok_or_else(|| format_err!("unexpected EOF looking for signature"))??;
 
         if BEGIN_SIGNATURE == line {
             break;
@@ -78,14 +83,18 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Resul
     let mut signature = String::with_capacity(1024);
 
     loop {
-        let line = lines.next().ok_or("unexpected EOF reading signature")??;
+        let line = lines
+            .next()
+            .ok_or_else(|| format_err!("unexpected EOF reading signature"))??;
         let line = line.trim();
 
         // checksum
         if line.len() == 5 && line.starts_with('=') {
             // TODO: Validate checksum? It's not part of the security model in any way.
 
-            let line = lines.next().ok_or("unexpected EOF reading tail")??;
+            let line = lines
+                .next()
+                .ok_or_else(|| format_err!("unexpected EOF reading tail"))??;
 
             ensure!(
                 END_MESSAGE == line,
@@ -111,10 +120,12 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(from: R, mut to: W) -> Resul
     })
 }
 
-fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, String>> {
+fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, String>, Error> {
     let mut headers = HashMap::new();
     loop {
-        let header = lines.next().ok_or("unexpected EOF reading headers")??;
+        let header = lines
+            .next()
+            .ok_or_else(|| format_err!("unexpected EOF reading headers"))??;
         let header = header.trim();
         if header.is_empty() {
             break;
@@ -123,7 +134,7 @@ fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, Stri
         let (key, colon_value) = header.split_at(
             header
                 .find(": ")
-                .ok_or_else(|| format!("header {:?} must contain a colon space", header))?,
+                .ok_or_else(|| format_err!("header {:?} must contain a colon space", header))?,
         );
 
         headers.insert(key.to_string(), colon_value[2..].to_string());

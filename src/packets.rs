@@ -8,8 +8,9 @@ use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use digest::Digest;
 use digest::FixedOutput;
+use failure::Error;
+use failure::ResultExt;
 
-use errors::*;
 use usize_from;
 use usize_from_u32;
 use HashAlg;
@@ -100,7 +101,7 @@ impl PubKeyPacket {
     }
 }
 
-pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
+pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>, Error> {
     let val = match from.read_u8() {
         Ok(val) => val,
         Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
@@ -132,9 +133,9 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
     let mut from = from.take(u64::from(len));
 
     let parsed = match tag {
-        2 => {
-            Packet::Signature(parse_signature_packet(&mut from).chain_err(|| "parsing signature")?)
-        }
+        2 => Packet::Signature(
+            parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
+        ),
         // 6: public key
         // 14: public subkey
         6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
@@ -155,16 +156,16 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
     Ok(Some(parsed))
 }
 
-fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature> {
-    match from.read_u8()? {
-        3 => parse_signature_packet_v3(from).chain_err(|| "v3"),
-        4 => parse_signature_packet_v4(from).chain_err(|| "v4"),
+fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {
+    Ok(match from.read_u8()? {
+        3 => parse_signature_packet_v3(from).with_context(|_| "v3")?,
+        4 => parse_signature_packet_v4(from).with_context(|_| "v4")?,
         other => bail!("not supported: unrecognised signature version: {}", other),
-    }
+    })
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.2
-fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature> {
+fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature, Error> {
     ensure!(5 == from.read_u8()?, "invalid authenticated data length");
 
     let mut authenticated_data = vec![0u8; 5];
@@ -193,7 +194,7 @@ fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.3
-fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature> {
+fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
     let mut authenticated_data = Vec::with_capacity(32);
     authenticated_data.push(4);
     authenticated_data.resize(6, 0);
@@ -211,7 +212,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature> {
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
     let issuer = find_issuer(&bad_subpackets)
-        .chain_err(|| "reading unsigned subpackets to determine issuer")?;
+        .with_context(|_| "reading unsigned subpackets to determine issuer")?;
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
@@ -228,7 +229,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.1
-fn sig_type(code: u8) -> Result<SignatureType> {
+fn sig_type(code: u8) -> Result<SignatureType, Error> {
     Ok(match code {
         0x01 => SignatureType::CanonicalisedText,
         0x10 => SignatureType::GenericCertificationUserId,
@@ -245,7 +246,7 @@ fn sig_type(code: u8) -> Result<SignatureType> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-9.1
-fn key_alg(code: u8) -> Result<PublicKeyAlg> {
+fn key_alg(code: u8) -> Result<PublicKeyAlg, Error> {
     Ok(match code {
         1 | 3 => PublicKeyAlg::Rsa,
         17 => PublicKeyAlg::Dsa,
@@ -254,7 +255,7 @@ fn key_alg(code: u8) -> Result<PublicKeyAlg> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-9.4
-fn hash_alg(code: u8) -> Result<HashAlg> {
+fn hash_alg(code: u8) -> Result<HashAlg, Error> {
     Ok(match code {
         1 => HashAlg::Md5,
         2 => HashAlg::Sha1,
@@ -267,7 +268,7 @@ fn hash_alg(code: u8) -> Result<HashAlg> {
     })
 }
 
-fn read_sig<R: Read>(mut from: R, key_alg: &PublicKeyAlg) -> Result<PublicKeySig> {
+fn read_sig<R: Read>(mut from: R, key_alg: &PublicKeyAlg) -> Result<PublicKeySig, Error> {
     Ok(match *key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
         PublicKeyAlg::Dsa => PublicKeySig::Dsa {
@@ -277,7 +278,7 @@ fn read_sig<R: Read>(mut from: R, key_alg: &PublicKeyAlg) -> Result<PublicKeySig
     })
 }
 
-fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
+fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket, Error> {
     // https://tools.ietf.org/html/rfc4880#section-5.5.2
     match from.read_u8()? {
         3 => bail!("not supported: version 3 key packets"),
@@ -322,7 +323,7 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket> {
 }
 
 // https://tools.ietf.org/html/rfc6637#section-9
-fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>> {
+fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let oid_len = from.read_u8()?;
     ensure!(
         0 != oid_len && 0xff != oid_len,
@@ -334,7 +335,7 @@ fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.4.1
-fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
+fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>, Error> {
     let mut issuer = None;
 
     for (id, data) in parse_subpackets(subpackets)? {
@@ -364,7 +365,7 @@ fn find_issuer(subpackets: &[u8]) -> Result<Option<[u8; 8]>> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.2.3.1
-fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>> {
+fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
     if data.is_empty() {
         return Ok(Vec::new());
     }
@@ -408,7 +409,7 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>> {
     Ok(ret)
 }
 
-fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>> {
+fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let len = from.read_u16::<BigEndian>()?;
     let mut data = vec![0u8; usize_from(len)];
     from.read_exact(&mut data)?;
@@ -416,7 +417,7 @@ fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>> {
 }
 
 /// <https://tools.ietf.org/html/rfc4880#section-3.2>
-fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>> {
+fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let bits: u16 = from.read_u16::<BigEndian>()?;
     if 0 == bits {
         // TODO: Is this a valid encoding?
@@ -504,7 +505,6 @@ fn is_bit_set(value: u8, bit_no: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
-    use std::io::Read;
     #[test]
     fn mpi() {
         use super::read_mpi;

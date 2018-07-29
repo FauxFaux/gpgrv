@@ -1,9 +1,10 @@
 use std::io;
 use std::io::Read;
 
+use failure::Error;
+use failure::ResultExt;
 use iowrap;
 
-use errors::*;
 use hash_multimap::HashMultiMap;
 use packets;
 use PubKey;
@@ -23,13 +24,13 @@ impl Keyring {
         }
     }
 
-    pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize> {
+    pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize, Error> {
         let mut reader = iowrap::Pos::new(io::BufReader::new(reader));
         let mut read = 0;
         let mut last = None;
         loop {
-            match packets::parse_packet(&mut reader).chain_err(|| {
-                format!(
+            match packets::parse_packet(&mut reader).with_context(|_| {
+                format_err!(
                     "parsing after after {:?} at around {}",
                     last,
                     reader.position()
@@ -44,7 +45,6 @@ impl Keyring {
                     continue
                 }
                 None => break,
-                other => bail!("unexpected packet in keyring: {:?}", other),
             }
 
             read += 1;

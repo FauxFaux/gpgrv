@@ -4,9 +4,9 @@ use std::io::Write;
 
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
+use failure::Error;
 
 use armour;
-use errors::*;
 use keyring::Keyring;
 use packets;
 use to_u32;
@@ -36,7 +36,7 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
     from: R,
     to: W,
     keyring: &Keyring,
-) -> Result<()> {
+) -> Result<(), Error> {
     let mut armour_removed = armour::parse_clearsign_armour(from, io::BufWriter::new(to))?;
     let sig_packets = io::Cursor::new(armour_removed.signature);
     let sig = match packets::parse_packet(sig_packets)? {
@@ -71,13 +71,15 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
         _ => bail!("unsupported signature"),
     };
 
-    for key in keyring.keys_with_id(BigEndian::read_u64(&sig.issuer.ok_or("missing issuer")?)) {
+    for key in keyring.keys_with_id(BigEndian::read_u64(
+        &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
+    )) {
         if ::verify(key, &sig.sig, &padded).is_ok() {
             return Ok(());
         }
     }
 
-    Err("no known keys could validate the signature".into())
+    bail!("no known keys could validate the signature")
 }
 
 fn make_tail(len: usize) -> [u8; 6] {

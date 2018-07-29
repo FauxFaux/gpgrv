@@ -1,7 +1,6 @@
 use digest::FixedOutput;
 use digest::Input;
-
-use errors::*;
+use failure::Error;
 
 #[derive(Clone)]
 pub enum Digestable {
@@ -48,7 +47,7 @@ impl Digestable {
     }
 
     // https://tools.ietf.org/html/rfc3447#section-9.2
-    pub fn emsa_pkcs1_v1_5(&self, hash: &[u8], output_len: usize) -> Result<Vec<u8>> {
+    pub fn emsa_pkcs1_v1_5(&self, hash: &[u8], output_len: usize) -> Result<Vec<u8>, Error> {
         // step 1: compute digest
 
         // step 2
