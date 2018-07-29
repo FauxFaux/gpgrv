@@ -3,15 +3,16 @@ use digest::FixedOutput;
 
 use errors::*;
 
+#[derive(Clone)]
 pub enum Digestable {
-    Sha1(::sha_1::Sha1),
+    Sha1(::sha1::Sha1),
     Sha256(::sha2::Sha256),
     Sha512(::sha2::Sha512),
 }
 
 impl Digestable {
     pub fn sha1() -> Digestable {
-        Digestable::Sha1(::sha_1::Sha1::default())
+        Digestable::Sha1(::sha1::Sha1::default())
     }
 
     pub fn sha256() -> Digestable {
@@ -37,10 +38,10 @@ impl Digestable {
         self.input().process(data)
     }
 
-    pub fn hash(&self) -> Vec<u8> {
+    pub fn hash(self) -> Vec<u8> {
         use self::Digestable::*;
-        match *self {
-            Sha1(x) => x.hash().to_vec(),
+        match self {
+            Sha1(x) => x.fixed_result().to_vec(),
             Sha256(x) => x.fixed_result().to_vec(),
             Sha512(x) => x.fixed_result().to_vec(),
         }

@@ -56,7 +56,7 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len()));
 
-    let hash = digest.hash();
+    let hash = digest.clone().hash();
 
     {
         let actual = BigEndian::read_u16(&hash);

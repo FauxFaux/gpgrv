@@ -8,7 +8,7 @@ extern crate hex;
 extern crate iowrap;
 extern crate num;
 extern crate sha2;
-extern crate sha_1;
+extern crate sha1;
 
 mod armour;
 mod digestable;

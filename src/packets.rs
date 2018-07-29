@@ -8,6 +8,7 @@ use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 
 use digest::Digest;
+use digest::FixedOutput;
 
 use HashAlg;
 use PublicKeySig;
@@ -69,7 +70,7 @@ impl PubKeyPacket {
 
         // https://tools.ietf.org/html/rfc4880#section-12.2
 
-        let mut digest = ::sha_1::Sha1::default();
+        let mut digest = ::sha1::Sha1::default();
         digest.input(&[0x99]);
         digest.input(&to_be_u16(1 + 4 + 1 + len));
         digest.input(&[self.version]);
@@ -83,7 +84,9 @@ impl PubKeyPacket {
             _ => unreachable!(),
         }
 
-        Some(digest.hash())
+        let mut ret = [0u8; 20];
+        ret.copy_from_slice(&digest.fixed_result());
+        Some(ret)
     }
 
     pub fn identity(&self) -> Option<u64> {
