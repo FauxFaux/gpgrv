@@ -1,13 +1,11 @@
 use std::io;
 use std::io::Read;
 
-use hash_multimap::HashMultiMap;
-
 use iowrap;
 
 use errors::*;
+use hash_multimap::HashMultiMap;
 use packets;
-
 use PubKey;
 
 pub struct Keyring {

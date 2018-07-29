@@ -1,5 +1,5 @@
-use digest::Input;
 use digest::FixedOutput;
+use digest::Input;
 
 use errors::*;
 

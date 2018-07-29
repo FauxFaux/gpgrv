@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-
 use std::hash::Hash;
 
 pub struct HashMultiMap<K, V> {
@@ -18,8 +17,12 @@ impl<K: Eq + Hash, V: Eq + Hash> HashMultiMap<K, V> {
         self.inner.entry(k).or_insert_with(HashSet::new).insert(v)
     }
 
-    pub fn entries<'h>(&'h self) -> Box<Iterator<Item=(&'h K, &'h V)> + 'h> {
-        Box::new(self.inner.iter().flat_map(|(k, v)| v.iter().map(move |v| (k, v))))
+    pub fn entries<'h>(&'h self) -> Box<Iterator<Item = (&'h K, &'h V)> + 'h> {
+        Box::new(
+            self.inner
+                .iter()
+                .flat_map(|(k, v)| v.iter().map(move |v| (k, v))),
+        )
     }
 }
 

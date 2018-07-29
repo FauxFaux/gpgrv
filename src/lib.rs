@@ -7,8 +7,8 @@ extern crate error_chain;
 extern crate hex;
 extern crate iowrap;
 extern crate num;
-extern crate sha2;
 extern crate sha1;
+extern crate sha2;
 
 mod armour;
 mod digestable;
@@ -21,11 +21,11 @@ mod packets;
 mod rsa;
 
 pub use armour::parse_clearsign_armour;
+pub use errors::*;
 pub use high::verify_clearsign_armour;
 pub use keyring::Keyring;
 pub use packets::parse_packet;
 pub use packets::Packet;
-pub use errors::*;
 
 #[derive(Debug)]
 pub enum PublicKeySig {
@@ -35,10 +35,23 @@ pub enum PublicKeySig {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum PubKey {
-    Rsa { n: Vec<u8>, e: Vec<u8> },
-    Ecdsa { oid: Vec<u8>, point: Vec<u8> },
-    Ed25519 { oid: Vec<u8>, point: Vec<u8> },
-    Elgaml { p: Vec<u8>, g: Vec<u8>, y: Vec<u8> },
+    Rsa {
+        n: Vec<u8>,
+        e: Vec<u8>,
+    },
+    Ecdsa {
+        oid: Vec<u8>,
+        point: Vec<u8>,
+    },
+    Ed25519 {
+        oid: Vec<u8>,
+        point: Vec<u8>,
+    },
+    Elgaml {
+        p: Vec<u8>,
+        g: Vec<u8>,
+        y: Vec<u8>,
+    },
     Dsa {
         p: Vec<u8>,
         q: Vec<u8>,

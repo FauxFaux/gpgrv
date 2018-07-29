@@ -6,17 +6,15 @@ use std::u32;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
-
 use digest::Digest;
 use digest::FixedOutput;
-
-use HashAlg;
-use PublicKeySig;
-use PubKey;
 
 use errors::*;
 use usize_from;
 use usize_from_u32;
+use HashAlg;
+use PubKey;
+use PublicKeySig;
 
 enum PublicKeyAlg {
     Rsa,
@@ -134,8 +132,9 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>> {
     let mut from = from.take(u64::from(len));
 
     let parsed = match tag {
-        2 => Packet::Signature(parse_signature_packet(&mut from)
-            .chain_err(|| "parsing signature")?),
+        2 => {
+            Packet::Signature(parse_signature_packet(&mut from).chain_err(|| "parsing signature")?)
+        }
         // 6: public key
         // 14: public subkey
         6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
@@ -504,8 +503,8 @@ fn is_bit_set(value: u8, bit_no: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
     use std::io::Cursor;
+    use std::io::Read;
     #[test]
     fn mpi() {
         use super::read_mpi;

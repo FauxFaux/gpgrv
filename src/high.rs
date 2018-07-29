@@ -2,17 +2,15 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use byteorder::ByteOrder;
 use byteorder::BigEndian;
+use byteorder::ByteOrder;
 
 use armour;
-use packets;
-use keyring::Keyring;
-
 use errors::*;
-
-use PublicKeySig;
+use keyring::Keyring;
+use packets;
 use to_u32;
+use PublicKeySig;
 
 /// Verify the data in a clearsigned armour stream
 ///
@@ -72,7 +70,6 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
         PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
         _ => bail!("unsupported signature"),
     };
-
 
     for key in keyring.keys_with_id(BigEndian::read_u64(&sig.issuer.ok_or("missing issuer")?)) {
         if ::verify(key, &sig.sig, &padded).is_ok() {

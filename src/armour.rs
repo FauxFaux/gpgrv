@@ -3,9 +3,9 @@ use std::io::BufRead;
 use std::io::Lines;
 use std::io::Write;
 
-use base64;
-
 use digestable::Digestable;
+
+use base64;
 use errors::*;
 
 const BEGIN_SIGNED: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
@@ -120,9 +120,11 @@ fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, Stri
             break;
         }
 
-        let (key, colon_value) = header.split_at(header
-            .find(": ")
-            .ok_or_else(|| format!("header {:?} must contain a colon space", header))?);
+        let (key, colon_value) = header.split_at(
+            header
+                .find(": ")
+                .ok_or_else(|| format!("header {:?} must contain a colon space", header))?,
+        );
 
         headers.insert(key.to_string(), colon_value[2..].to_string());
     }

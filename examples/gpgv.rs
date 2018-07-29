@@ -38,15 +38,17 @@ fn run() -> Result<()> {
     let mut keyring = gpgrv::Keyring::new();
     for path in matches.values_of_os("keyring").unwrap() {
         keyring
-            .append_keys_from(fs::File::open(path)
-                .chain_err(|| format!("opening keyring {:?}", path))?)
+            .append_keys_from(
+                fs::File::open(path).chain_err(|| format!("opening keyring {:?}", path))?,
+            )
             .chain_err(|| format!("reading keyring {:?}", path))?;
     }
 
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_clearsign_armour(
-            io::BufReader::new(fs::File::open(file)
-                .chain_err(|| format!("opening input file {:?}", file))?),
+            io::BufReader::new(
+                fs::File::open(file).chain_err(|| format!("opening input file {:?}", file))?,
+            ),
             iowrap::Ignore::new(),
             &keyring,
         ).chain_err(|| format!("verifying input file {:?}", file))?;
