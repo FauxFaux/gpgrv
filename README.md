@@ -30,3 +30,18 @@ be using [`gpgme`](https://crates.io/crates/gpgme).
  * (Intentionally) not constant time: Cannot be used for certain crypto
    applications. This is less important for signature verification with
    public keys.
+
+## License
+
+Licensed under either of
+
+ * Apache License, Version 2.0
+ * MIT license
+
+at your option.
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
+additional terms or conditions.

@@ -1,7 +1,18 @@
 [package]
 authors = ["Chris West (Faux) <git@goeswhere.com>"]
+categories = [
+    "authentication",
+    "cryptography",
+    "parsing",
+]
 name = "gpgrv"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/FauxFaux/gpgrv"
 version = "0.1.0"
+
+[badges.travis-ci]
+repository = "FauxFaux/gpgrv"
 
 [dependencies]
 base64 = "0.9"
