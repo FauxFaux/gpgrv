@@ -11,7 +11,8 @@ fn split() {
     gpgrv::parse_clearsign_armour(
         io::Cursor::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
-    ).unwrap();
+    )
+    .unwrap();
 }
 
 #[test]
@@ -22,7 +23,8 @@ fn verify() {
         io::Cursor::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
         &keyring,
-    ).unwrap();
+    )
+    .unwrap();
 }
 
 #[test]

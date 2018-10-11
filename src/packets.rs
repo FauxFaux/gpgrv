@@ -467,7 +467,7 @@ fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
 
     if mpi.is_empty() {
         // zero length, no data
-        digest.process(&[0, 0]);
+        digest.input(&[0, 0]);
         return;
     }
 
@@ -477,8 +477,8 @@ fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
     let bits_len = 1 + usize::from(top_bit(first_byte));
     let total_len = bytes_len + bits_len;
 
-    digest.process(&to_be_u16(total_len));
-    digest.process(mpi);
+    digest.input(&to_be_u16(total_len));
+    digest.input(mpi);
 }
 
 fn to_be_u16(val: usize) -> [u8; 2] {

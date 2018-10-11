@@ -50,7 +50,8 @@ fn main() -> Result<(), Error> {
             ),
             iowrap::Ignore::new(),
             &keyring,
-        ).with_context(|_| format_err!("verifying input file {:?}", file))?;
+        )
+        .with_context(|_| format_err!("verifying input file {:?}", file))?;
     }
 
     Ok(())

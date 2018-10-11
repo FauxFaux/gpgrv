@@ -22,27 +22,20 @@ impl Digestable {
         Digestable::Sha512(::sha2::Sha512::default())
     }
 
-    pub fn input(&mut self) -> &mut Input {
-        use self::Digestable::*;
+    // Like digest::Input
+    pub fn process(&mut self, data: &[u8]) {
         match *self {
-            Sha1(ref mut x) => x,
-            Sha256(ref mut x) => x,
-            Sha512(ref mut x) => x,
+            Digestable::Sha1(ref mut x) => x.input(data),
+            Digestable::Sha256(ref mut x) => x.input(data),
+            Digestable::Sha512(ref mut x) => x.input(data),
         }
     }
 
-    // Like digest::Input
-    pub fn process(&mut self, data: &[u8]) {
-        //println!("digest: {}", hex::encode(data));
-        self.input().process(data)
-    }
-
     pub fn hash(self) -> Vec<u8> {
-        use self::Digestable::*;
         match self {
-            Sha1(x) => x.fixed_result().to_vec(),
-            Sha256(x) => x.fixed_result().to_vec(),
-            Sha512(x) => x.fixed_result().to_vec(),
+            Digestable::Sha1(x) => x.fixed_result().to_vec(),
+            Digestable::Sha256(x) => x.fixed_result().to_vec(),
+            Digestable::Sha512(x) => x.fixed_result().to_vec(),
         }
     }
 
