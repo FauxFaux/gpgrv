@@ -5,6 +5,7 @@ use std::io;
 const HELLO_WORLD: &str = include_str!("hello-world.asc");
 const EMPTY_SIG: &[u8] = include_bytes!("empty-message.inline-sig");
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
+const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("real-world-dizziest.gpg");
 
 #[test]
 fn split() {
@@ -25,6 +26,14 @@ fn verify() {
         &keyring,
     )
     .unwrap();
+}
+
+#[test]
+fn real_world_dizziest() {
+    let mut keyring = gpgrv::Keyring::new();
+    keyring
+        .append_keys_from(io::Cursor::new(REAL_WORLD_DIZZIEST))
+        .unwrap();
 }
 
 #[test]

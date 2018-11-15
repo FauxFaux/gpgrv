@@ -139,8 +139,10 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>, Error> {
         // 6: public key
         // 14: public subkey
         6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
+        // 12: admin's specified trust information
         // 13: user id (textual name)
-        13 => {
+        // 17: extended user id (non-textual name information, e.g. image)
+        12 | 13 | 17 => {
             from.read_exact(&mut vec![0u8; usize_from_u32(len)])?;
             Packet::IgnoredJunk
         }
