@@ -1,6 +1,6 @@
 use failure::Error;
 
-use mpi;
+use crate::mpi;
 
 pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<(), Error> {
     if sig.len() < (2048 / 8) {

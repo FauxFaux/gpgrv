@@ -3,7 +3,7 @@ use std::io::BufRead;
 use std::io::Lines;
 use std::io::Write;
 
-use digestable::Digestable;
+use crate::digestable::Digestable;
 use failure::Error;
 
 use base64;

@@ -5,9 +5,9 @@ use failure::Error;
 use failure::ResultExt;
 use iowrap;
 
-use hash_multimap::HashMultiMap;
-use packets;
-use PubKey;
+use crate::hash_multimap::HashMultiMap;
+use crate::packets;
+use crate::PubKey;
 
 pub struct Keyring {
     /// Allows a (mathematical) key to have multiple ids.

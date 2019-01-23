@@ -2,14 +2,14 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
+use cast::u32;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use failure::Error;
 
-use keyring::Keyring;
-use packets;
-use to_u32;
-use PublicKeySig;
+use crate::keyring::Keyring;
+use crate::packets;
+use crate::PublicKeySig;
 
 /// Verify the data in a clearsigned armour stream
 ///
@@ -54,7 +54,7 @@ pub fn verify_message<R: BufRead, W: Write>(
     };
 
     digest.process(&sig.authenticated_data);
-    digest.process(&make_tail(sig.authenticated_data.len()));
+    digest.process(&make_tail(sig.authenticated_data.len())?);
 
     let hash = digest.clone().hash();
 
@@ -76,7 +76,7 @@ pub fn verify_message<R: BufRead, W: Write>(
     for key in keyring.keys_with_id(BigEndian::read_u64(
         &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
     )) {
-        if ::verify(key, &sig.sig, &padded).is_ok() {
+        if crate::verify(key, &sig.sig, &padded).is_ok() {
             return Ok(());
         }
     }
@@ -84,10 +84,10 @@ pub fn verify_message<R: BufRead, W: Write>(
     bail!("no known keys could validate the signature")
 }
 
-fn make_tail(len: usize) -> [u8; 6] {
+fn make_tail(len: usize) -> Result<[u8; 6], Error> {
     let mut tail = [0u8; 6];
     tail[0] = 0x04;
     tail[1] = 0xff;
-    BigEndian::write_u32(&mut tail[2..], to_u32(len));
-    tail
+    BigEndian::write_u32(&mut tail[2..], u32(len)?);
+    Ok(tail)
 }

@@ -9,9 +9,9 @@ use failure::Error;
 use failure::ResultExt;
 
 use crate::armour;
+use crate::digestable::Digestable;
 use crate::packets;
-use digestable::Digestable;
-use packets::Packet;
+use crate::packets::Packet;
 
 pub struct Doc {
     pub digest: Option<Digestable>,
@@ -33,7 +33,7 @@ pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc
     }
 }
 
-pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Result<Doc, Error> {
+pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Result<Doc, Error> {
     let mut lines = from.lines();
     match lines
         .next()
@@ -61,7 +61,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> R
     }
 }
 
-pub fn read_binary_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Result<Doc, Error> {
+pub fn read_binary_doc<R: BufRead, W: Write>(from: R, _put_content: W) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
     let mut packets = Vec::with_capacity(16);
     while let Some(packet) = packets::parse_packet(&mut reader)

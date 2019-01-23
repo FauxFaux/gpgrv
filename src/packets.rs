@@ -3,6 +3,7 @@ use std::io::Read;
 use std::u16;
 use std::u32;
 
+use cast::usize;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
@@ -11,11 +12,9 @@ use digest::FixedOutput;
 use failure::Error;
 use failure::ResultExt;
 
-use usize_from;
-use usize_from_u32;
-use HashAlg;
-use PubKey;
-use PublicKeySig;
+use crate::HashAlg;
+use crate::PubKey;
+use crate::PublicKeySig;
 
 enum PublicKeyAlg {
     Rsa,
@@ -144,7 +143,7 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>, Error> {
         // 13: user id (textual name)
         // 17: extended user id (non-textual name information, e.g. image)
         12 | 13 | 17 => {
-            from.read_exact(&mut vec![0u8; usize_from_u32(len)])?;
+            from.read_exact(&mut vec![0u8; usize(len)])?;
             Packet::IgnoredJunk
         }
         other => bail!("not supported: packet tag: {}, len: {}", other, len),
@@ -208,7 +207,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
     let hash_alg = hash_alg(authenticated_data[3])?;
 
     let good_subpackets_len = BigEndian::read_u16(&authenticated_data[4..6]);
-    let good_subpackets_end = authenticated_data.len() + usize_from(good_subpackets_len);
+    let good_subpackets_end = authenticated_data.len() + usize(good_subpackets_len);
     authenticated_data.resize(good_subpackets_end, 0);
     from.read_exact(&mut authenticated_data[6..])?;
 
@@ -390,7 +389,7 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
         } else {
             assert_eq!(255, data[0]);
             len_len = 5;
-            len = usize_from_u32(BigEndian::read_u32(&data[1..5]));
+            len = usize(BigEndian::read_u32(&data[1..5]));
         }
 
         ensure!(len != 0, "illegal empty subpacket");
@@ -415,7 +414,7 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
 
 fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let len = from.read_u16::<BigEndian>()?;
-    let mut data = vec![0u8; usize_from(len)];
+    let mut data = vec![0u8; usize(len)];
     from.read_exact(&mut data)?;
     Ok(data)
 }
@@ -429,7 +428,7 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     }
 
     let bytes = (u32::from(bits) + 7) / 8;
-    let mut data = vec![0u8; usize_from_u32(bytes)];
+    let mut data = vec![0u8; usize(bytes)];
     from.read_exact(&mut data)?;
 
     let first_byte = data[0];

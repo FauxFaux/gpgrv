@@ -22,11 +22,11 @@ mod rsa;
 
 use failure::Error;
 
-pub use high::verify_message;
-pub use keyring::Keyring;
-pub use load::read_doc;
-pub use packets::parse_packet;
-pub use packets::Packet;
+pub use crate::high::verify_message;
+pub use crate::keyring::Keyring;
+pub use crate::load::read_doc;
+pub use crate::packets::parse_packet;
+pub use crate::packets::Packet;
 
 #[derive(Debug)]
 pub enum PublicKeySig {
@@ -84,19 +84,4 @@ pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()
         PubKey::Dsa { .. } => bail!("not implemented: verify dsa signatures"),
         PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
     }
-}
-
-/// <https://github.com/rust-lang/rust/issues/44290>
-fn usize_from(val: u16) -> usize {
-    val as usize
-}
-
-fn usize_from_u32(val: u32) -> usize {
-    assert!(u64::from(val) <= (std::usize::MAX as u64));
-    val as usize
-}
-
-fn to_u32(val: usize) -> u32 {
-    assert!((val as u64) <= u64::from(std::u32::MAX));
-    val as u32
 }
