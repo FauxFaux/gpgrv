@@ -2,10 +2,10 @@ extern crate gpgrv;
 
 use std::io;
 
-const HELLO_WORLD: &str = include_str!("hello-world.asc");
-const EMPTY_SIG: &[u8] = include_bytes!("empty-message.inline-sig");
-const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
-const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("real-world-dizziest.gpg");
+const EMPTY_SIG: &[u8] = include_bytes!("smoke/empty-message.inline-sig");
+const FAUX_KEY: &[u8] = include_bytes!("smoke/faux.pubkey");
+const HELLO_WORLD: &str = include_str!("smoke/hello-world.asc");
+const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("smoke/real-world-dizziest.gpg");
 
 #[test]
 fn split() {
