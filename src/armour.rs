@@ -69,7 +69,7 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(
         // we don't want a trailing newline, apparently,
         // even though it's always there in the message
         if !first {
-            to.write_all(b"\r\n")?;
+            to.write_all(b"\n")?;
             digest.process(b"\r\n");
         }
         first = false;
