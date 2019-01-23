@@ -15,15 +15,16 @@ mod digestable;
 mod hash_multimap;
 mod high;
 mod keyring;
+mod load;
 mod mpi;
 mod packets;
 mod rsa;
 
 use failure::Error;
 
-pub use armour::parse_clearsign_armour;
-pub use high::verify_clearsign_armour;
+pub use high::verify_message;
 pub use keyring::Keyring;
+pub use load::read_doc;
 pub use packets::parse_packet;
 pub use packets::Packet;
 

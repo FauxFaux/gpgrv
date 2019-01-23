@@ -6,7 +6,6 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use failure::Error;
 
-use armour;
 use keyring::Keyring;
 use packets;
 use to_u32;
@@ -26,20 +25,19 @@ use PublicKeySig;
 ///
 /// fn check_stdin(keyring: &gpgrv::Keyring) {
 ///     let mut temp = tempfile::tempfile().unwrap();
-///     gpgrv::verify_clearsign_armour(BufReader::new(stdin()), &mut temp, keyring)
+///     gpgrv::verify_message(BufReader::new(stdin()), &mut temp, keyring)
 ///         .expect("verification");
 ///     temp.seek(SeekFrom::Start(0)).unwrap();
 ///     std::io::copy(&mut temp, &mut stdout()).unwrap();
 /// }
 /// ```
-pub fn verify_clearsign_armour<R: BufRead, W: Write>(
+pub fn verify_message<R: BufRead, W: Write>(
     from: R,
     to: W,
     keyring: &Keyring,
 ) -> Result<(), Error> {
-    let mut armour_removed = armour::parse_clearsign_armour(from, io::BufWriter::new(to))?;
-    let sig_packets = io::Cursor::new(armour_removed.signature);
-    let sig = match packets::parse_packet(sig_packets)? {
+    let mut armour_removed = crate::load::read_doc(from, io::BufWriter::new(to))?;
+    let sig = match armour_removed.packets.into_iter().next() {
         Some(packets::Packet::Signature(s)) => s,
         None => bail!("no signature in signature stream"),
         other => bail!("unexpected packet in signature: {:?}", other),
@@ -50,7 +48,11 @@ pub fn verify_clearsign_armour<R: BufRead, W: Write>(
         other => bail!("invalid signature type in armour: {:?}", other),
     };
 
-    let digest = &mut armour_removed.digest;
+    let digest = match armour_removed.digest.as_mut() {
+        Some(d) => d,
+        None => bail!("document wasn't a message (i.e. there was no body)"),
+    };
+
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len()));
 

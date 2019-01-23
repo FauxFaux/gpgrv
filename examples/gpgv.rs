@@ -43,7 +43,7 @@ fn main() -> Result<(), Error> {
     }
 
     for file in matches.values_of_os("FILES").unwrap() {
-        gpgrv::verify_clearsign_armour(
+        gpgrv::verify_message(
             io::BufReader::new(
                 fs::File::open(file)
                     .with_context(|_| format_err!("opening input file {:?}", file))?,

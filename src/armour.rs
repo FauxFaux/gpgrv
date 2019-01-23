@@ -8,32 +8,21 @@ use failure::Error;
 
 use base64;
 
-const BEGIN_SIGNED: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
-const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
+pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
+pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
 const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
-pub struct Signature {
+pub struct Message {
     pub digest: Digestable,
     pub body_headers: HashMap<String, String>,
     pub sig_headers: HashMap<String, String>,
-    pub signature: Vec<u8>,
+    pub block: Vec<u8>,
 }
 
-pub fn parse_clearsign_armour<R: BufRead, W: Write>(
-    from: R,
+pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
+    mut lines: Lines<R>,
     mut to: W,
-) -> Result<Signature, Error> {
-    let mut lines = from.lines();
-    let first = lines
-        .next()
-        .ok_or_else(|| format_err!("unexpected EOF looking for begin marker"))??;
-    ensure!(
-        first == BEGIN_SIGNED,
-        "first line must be {}, not {:?}",
-        first,
-        BEGIN_SIGNED
-    );
-
+) -> Result<Message, Error> {
     let body_headers = take_headers(&mut lines)?;
 
     let mut digest = match body_headers.get("Hash").map(|x| x.as_str()) {
@@ -78,6 +67,19 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(
         digest.process(line.as_bytes());
     }
 
+    let (sig_headers, signature) = parse_armoured_signature_body(lines)?;
+
+    Ok(Message {
+        digest,
+        body_headers,
+        sig_headers,
+        block: signature,
+    })
+}
+
+pub fn parse_armoured_signature_body<R: BufRead>(
+    mut lines: Lines<R>,
+) -> Result<(HashMap<String, String>, Vec<u8>), Error> {
     let sig_headers = take_headers(&mut lines)?;
 
     let mut signature = String::with_capacity(1024);
@@ -110,14 +112,7 @@ pub fn parse_clearsign_armour<R: BufRead, W: Write>(
         signature.push_str(line);
     }
 
-    let signature = base64::decode(&signature)?;
-
-    Ok(Signature {
-        digest,
-        body_headers,
-        sig_headers,
-        signature,
-    })
+    Ok((sig_headers, base64::decode(&signature)?))
 }
 
 fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, String>, Error> {

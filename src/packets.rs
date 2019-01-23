@@ -24,6 +24,7 @@ enum PublicKeyAlg {
 
 #[derive(Debug)]
 pub enum SignatureType {
+    Binary,
     CanonicalisedText,
     GenericCertificationUserId,
     PersonaCertificationUserId,
@@ -233,6 +234,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
 // https://tools.ietf.org/html/rfc4880#section-5.2.1
 fn sig_type(code: u8) -> Result<SignatureType, Error> {
     Ok(match code {
+        0x00 => SignatureType::Binary,
         0x01 => SignatureType::CanonicalisedText,
         0x10 => SignatureType::GenericCertificationUserId,
         0x11 => SignatureType::PersonaCertificationUserId,

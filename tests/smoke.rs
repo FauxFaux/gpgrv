@@ -9,7 +9,7 @@ const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("smoke/real-world-dizziest.gpg
 
 #[test]
 fn split() {
-    gpgrv::parse_clearsign_armour(
+    gpgrv::read_doc(
         io::Cursor::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
     )
@@ -20,7 +20,7 @@ fn split() {
 fn verify() {
     let mut keyring = gpgrv::Keyring::new();
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
-    gpgrv::verify_clearsign_armour(
+    gpgrv::verify_message(
         io::Cursor::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
         &keyring,

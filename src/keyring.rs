@@ -42,7 +42,7 @@ impl Keyring {
                     self.keys.insert(key.math, identity);
                 }
                 Some(packets::Packet::IgnoredJunk) | Some(packets::Packet::Signature(_)) => {
-                    continue
+                    continue;
                 }
                 None => break,
             }
