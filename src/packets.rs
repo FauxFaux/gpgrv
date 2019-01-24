@@ -158,23 +158,27 @@ fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, 
             parse_signature_packet(from).with_context(|_| "parsing signature")?,
         ),
         3 => bail!("not supported: symmetric key encrypted session key"),
-        4 => bail!("not supported: one pass signature"),
         5 => bail!("not supported: secret key"),
         // 6: public key
         // 14: public subkey
         6 | 14 => Packet::PubKey(parse_pubkey_packet(from)?),
         7 => bail!("not supported: secret subkey"),
-        8 => bail!("not supported: compressed data"),
+        8 => unimplemented!("compression result: {:?}", parse_compressed_packet(from)?),
         9 => bail!("not supported: symmetrically encrypted data"),
         10 => bail!("not supported: marker"),
-        11 => bail!("not supported: literal data"),
+        11 => {
+            parse_literal_data(from)?;
+            // TODO: actual build a packet
+            Packet::IgnoredJunk
+        },
+        // 4: one pass signature helper
         // 12: admin's specified trust information
         // 13: user id (textual name)
         // 14: public subkey (handled above)
         // 15: not defined
         // 16: not defined
         // 17: extended user id (non-textual name information, e.g. image)
-        12 | 13 | 17 => {
+        4 | 12 | 13 | 17 => {
             let len = match len {
                 Some(len) => len,
                 None => bail!("indeterminate length {} not supported", tag),
@@ -355,6 +359,23 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket, Error> {
     })
 }
 
+// https://tools.ietf.org/html/rfc4880#section-5.6
+fn parse_compressed_packet<R: Read>(mut from: R) -> Result<(), Error> {
+    // https://tools.ietf.org/html/rfc4880#section-9.3
+    match from.read_u8()? {
+        0 => bail!("not supported: uncompressed compression"),
+        1 => (),
+        2 => bail!("not supported: zlib compression"),
+        3 => bail!("not supported: bzip2 compression"),
+        other => bail!("not recognised: {} compression mode", other),
+    }
+    let mut dec = libflate::deflate::Decoder::new(from);
+    while let Some(packet) = parse_packet(Box::new(&mut dec) as Box<Read>)? {
+        println!("inside compression: {:?}", packet);
+    }
+    Ok(())
+}
+
 // https://tools.ietf.org/html/rfc6637#section-9
 fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let oid_len = from.read_u8()?;
@@ -440,6 +461,16 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
     }
 
     Ok(ret)
+}
+
+// https://tools.ietf.org/html/rfc4880#section-5.9
+fn parse_literal_data<R: Read>(mut from: R) -> Result<(), Error> {
+    let format = from.read_u8()?;
+    let name_len = from.read_u8()?;
+    from.read_exact(&mut vec![0u8; usize(name_len)])?;
+    let mtime = from.read_u32::<BigEndian>()?;
+    io::copy(&mut from, &mut iowrap::Ignore::new())?;
+    Ok(())
 }
 
 fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
