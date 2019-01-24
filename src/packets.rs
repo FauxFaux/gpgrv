@@ -122,40 +122,70 @@ pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>, Error> {
         tag = (val & 0b0011_1100) >> 2;
         let len_code = val & 0b0000_0011;
         len = match len_code {
-            0 => u32::from(from.read_u8()?),
-            1 => u32::from(from.read_u16::<BigEndian>()?),
-            2 => from.read_u32::<BigEndian>()?,
-            3 => bail!("not supported: indeterminate length packets"),
+            0 => Some(u32::from(from.read_u8()?)),
+            1 => Some(u32::from(from.read_u16::<BigEndian>()?)),
+            2 => Some(from.read_u32::<BigEndian>()?),
+            3 => None,
             _ => unreachable!(),
         };
     }
 
-    let mut from = from.take(u64::from(len));
+    let parsed = if let Some(len) = len {
+        let mut from = from.take(u64::from(len));
 
-    let parsed = match tag {
-        2 => Packet::Signature(
-            parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
-        ),
-        // 6: public key
-        // 14: public subkey
-        6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
-        // 12: admin's specified trust information
-        // 13: user id (textual name)
-        // 17: extended user id (non-textual name information, e.g. image)
-        12 | 13 | 17 => {
-            from.read_exact(&mut vec![0u8; usize(len)])?;
-            Packet::IgnoredJunk
-        }
-        other => bail!("not supported: packet tag: {}, len: {}", other, len),
+        let parsed = parse_tag(&mut from, tag, Some(len))?;
+
+        ensure!(
+            0 == from.limit(),
+            "parser bug: failed to read {} trailing bytes",
+            from.limit()
+        );
+
+        parsed
+    } else {
+        parse_tag(from, tag, len)?
     };
 
-    ensure!(
-        0 == from.limit(),
-        "parser bug: failed to read {} trailing bytes",
-        from.limit()
-    );
-
     Ok(Some(parsed))
+}
+
+/// https://tools.ietf.org/html/rfc4880#section-4.3
+fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, Error> {
+    Ok(match tag {
+        0 => bail!("reserved tag: 0"),
+        1 => bail!("not supported: public key encrypted session key"),
+        2 => Packet::Signature(
+            parse_signature_packet(from).with_context(|_| "parsing signature")?,
+        ),
+        3 => bail!("not supported: symmetric key encrypted session key"),
+        4 => bail!("not supported: one pass signature"),
+        5 => bail!("not supported: secret key"),
+        // 6: public key
+        // 14: public subkey
+        6 | 14 => Packet::PubKey(parse_pubkey_packet(from)?),
+        7 => bail!("not supported: secret subkey"),
+        8 => bail!("not supported: compressed data"),
+        9 => bail!("not supported: symmetrically encrypted data"),
+        10 => bail!("not supported: marker"),
+        11 => bail!("not supported: literal data"),
+        // 12: admin's specified trust information
+        // 13: user id (textual name)
+        // 14: public subkey (handled above)
+        // 15: not defined
+        // 16: not defined
+        // 17: extended user id (non-textual name information, e.g. image)
+        12 | 13 | 17 => {
+            let len = match len {
+                Some(len) => len,
+                None => bail!("indeterminate length {} not supported", tag),
+            };
+            from.read_exact(&mut vec![0u8; usize(len)])?;
+            Packet::IgnoredJunk
+        },
+        18 => bail!("not supported: symmetrically encrypted and maced data"),
+        19 => bail!("not supported: mac"),
+        other => bail!("not recognised: packet tag: {}, len: {:?}", other, len),
+    })
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {

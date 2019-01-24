@@ -19,11 +19,11 @@ fn load() -> Result<(), Error> {
         ("dat", "detach armour ", &include_bytes!("formats/output.dat.detach-armour")[..]),
         ("dat", "detach binary ", &include_bytes!("formats/output.dat.detach-binary")[..]),
         ("dat", "inline armour ", &include_bytes!("formats/output.dat.inline-armour")[..]),
-        // ("dat", "inline binary ", &include_bytes!("formats/output.dat.inline-binary")[..]),
+        ("dat", "inline binary ", &include_bytes!("formats/output.dat.inline-binary")[..]),
         ("txt", "detach armour ", &include_bytes!("formats/output.txt.detach-armour")[..]),
         ("txt", "detach binary ", &include_bytes!("formats/output.txt.detach-binary")[..]),
         ("txt", "inline armour ", &include_bytes!("formats/output.txt.inline-armour")[..]),
-        // ("txt", "inline binary ", &include_bytes!("formats/output.txt.inline-binary")[..]),
+        ("txt", "inline binary ", &include_bytes!("formats/output.txt.inline-binary")[..]),
     ];
 
     for (input, name, file) in files {
