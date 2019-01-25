@@ -1,17 +1,21 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
 use failure::bail;
 use failure::ensure;
+use failure::err_msg;
 use failure::Error;
 use failure::ResultExt;
 
 use crate::armour;
 use crate::digestable::Digestable;
 use crate::packets;
+use crate::packets::Event;
 use crate::packets::Packet;
+use crate::packets::Signature;
 
 #[derive(Clone, Debug)]
 pub struct Doc {
@@ -19,7 +23,7 @@ pub struct Doc {
     pub data_header: Option<packets::PlainData>,
     pub body_headers: HashMap<String, String>,
     pub sig_headers: HashMap<String, String>,
-    pub packets: Vec<Packet>,
+    pub signatures: Vec<Signature>,
 }
 
 pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
@@ -45,20 +49,28 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
         armour::BEGIN_SIGNED_MESSAGE => {
             let msg = armour::parse_armoured_signed_message(lines, put_content)?;
 
+            let signatures = read_signatures_only(io::Cursor::new(msg.block))?;
+
             Ok(Doc {
                 data_digest: Some(msg.digest),
                 data_header: None,
                 body_headers: msg.body_headers,
                 sig_headers: msg.sig_headers,
-                packets: read_binary_doc(io::Cursor::new(msg.block), iowrap::Ignore::new())?
-                    .packets,
+                signatures,
             })
         }
         armour::BEGIN_SIGNATURE => {
             let (sig_headers, block) = armour::parse_armoured_signature_body(lines)?;
-            let mut doc = read_binary_doc(io::Cursor::new(block), put_content)?;
-            doc.sig_headers = sig_headers;
-            Ok(doc)
+
+            let signatures = read_signatures_only(io::Cursor::new(block))?;
+
+            Ok(Doc {
+                data_digest: None,
+                data_header: None,
+                body_headers: HashMap::new(),
+                sig_headers,
+                signatures,
+            })
         }
         other => bail!("invalid header line: {:?}", other),
     }
@@ -66,28 +78,66 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
 
 pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
-    let mut packets = Vec::with_capacity(16);
+    let mut signatures = Vec::with_capacity(16);
     let mut data_header = None;
-    packets::parse_packets(&mut reader, &mut |ev| match ev {
-        packets::Event::Packet(p) => {
-            packets.push(p);
-            Ok(())
-        }
-        packets::Event::PlainData(header, from) => {
-            if data_header.is_some() {
-                bail!("not supported: multiple plain data segments");
+    let mut hash_types = HashSet::new();
+    packets::parse_packets(&mut reader, &mut |ev| {
+        match ev {
+            Event::Packet(Packet::Signature(sig)) => signatures.push(sig),
+            Event::Packet(Packet::OnePassHelper(help)) => {
+                hash_types.insert(help.hash_type);
             }
-            io::copy(from, &mut put_content)?;
-            data_header = Some(header);
-            Ok(())
+            Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::PubKey(_)) => (),
+            Event::PlainData(header, from) => {
+                if data_header.is_some() {
+                    bail!("not supported: multiple plain data segments");
+                }
+
+                let hash_type = *match hash_types.len() {
+                    0 => bail!("no hash type hint provided before document"),
+                    1 => hash_types.iter().next().unwrap(),
+                    _ => bail!("unsupported: multiple hash type hints"),
+                };
+
+                let digestable = match hash_type {
+                    super::HashAlg::Sha1 => Digestable::sha1(),
+                    super::HashAlg::Sha256 => Digestable::sha256(),
+                    super::HashAlg::Sha512 => Digestable::sha512(),
+                    other => bail!("unsupported binary hash function: {:?}", other),
+                };
+
+                io::copy(from, &mut put_content)?;
+                data_header = Some(header);
+            }
         }
+        Ok(())
     })
     .with_context(|_| format_err!("parsing after at around {}", reader.position()))?;
+
     Ok(Doc {
         data_digest: None,
         data_header,
         body_headers: HashMap::new(),
         sig_headers: HashMap::new(),
-        packets,
+        signatures,
     })
+}
+
+pub fn read_signatures_only<R: BufRead>(from: R) -> Result<Vec<packets::Signature>, Error> {
+    let mut signatures = Vec::new();
+
+    packets::parse_packets(from, &mut |ev| match ev {
+        Event::Packet(Packet::Signature(sig)) => {
+            signatures.push(sig);
+            Ok(())
+        }
+        Event::Packet(Packet::IgnoredJunk) => Ok(()),
+        Event::Packet(other) => Err(format_err!(
+            "unexpected packet in signature block: {:?}",
+            other
+        )),
+        Event::PlainData(_, _) => Err(err_msg("unexpected plain data in signature doc")),
+    })?;
+
+    Ok(signatures)
 }

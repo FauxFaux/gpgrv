@@ -37,8 +37,8 @@ pub fn verify_message<R: BufRead, W: Write>(
     keyring: &Keyring,
 ) -> Result<(), Error> {
     let mut armour_removed = crate::load::read_doc(from, io::BufWriter::new(to))?;
-    let sig = match armour_removed.packets.into_iter().next() {
-        Some(packets::Packet::Signature(s)) => s,
+    let sig = match armour_removed.signatures.into_iter().next() {
+        Some(s) => s,
         None => bail!("no signature in signature stream"),
         other => bail!("unexpected packet in signature: {:?}", other),
     };

@@ -63,7 +63,7 @@ pub enum PubKey {
     },
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum HashAlg {
     Sha1,
     Sha224,

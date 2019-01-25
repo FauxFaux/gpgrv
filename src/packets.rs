@@ -56,10 +56,10 @@ pub struct PubKeyPacket {
 
 #[derive(Debug, Copy, Clone)]
 pub struct OnePassHelper {
-    signature_type: SignatureType,
-    hash_type: HashAlg,
-    pubkey_type: (),
-    pubkey_id: u64,
+    pub signature_type: SignatureType,
+    pub hash_type: HashAlg,
+    pub pubkey_type: (),
+    pub pubkey_id: u64,
 }
 
 #[derive(Debug, Copy, Clone)]
