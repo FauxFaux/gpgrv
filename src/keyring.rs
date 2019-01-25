@@ -40,7 +40,9 @@ impl Keyring {
                 read += 1;
                 Ok(())
             }
-            Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::Signature(_)) => Ok(()),
+            Event::Packet(Packet::IgnoredJunk)
+            | Event::Packet(Packet::Signature(_))
+            | Event::Packet(Packet::OnePassHelper(_)) => Ok(()),
             Event::PlainData(_, _) => Err(err_msg("unsupported: message data in keyring")),
         })
         .with_context(|_| {

@@ -55,6 +55,14 @@ pub struct PubKeyPacket {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct OnePassHelper {
+    signature_type: SignatureType,
+    hash_type: HashAlg,
+    pubkey_type: (),
+    pubkey_id: u64,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum PlainFormat {
     Binary,
     Text,
@@ -73,6 +81,7 @@ pub enum Packet {
     IgnoredJunk,
     PubKey(PubKeyPacket),
     Signature(Signature),
+    OnePassHelper(OnePassHelper),
 }
 
 pub enum Event<'e> {
@@ -163,6 +172,9 @@ where
             parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
         )))?,
         3 => bail!("not supported: symmetric key encrypted session key"),
+        4 => into(Event::Packet(Packet::OnePassHelper(parse_one_pass_helper(
+            &mut from,
+        )?)))?,
         5 => bail!("not supported: secret key"),
         // 6: public key
         // 14: public subkey
@@ -177,14 +189,13 @@ where
             let header = parse_literal_data(&mut from)?;
             into(Event::PlainData(header, &mut from))?;
         }
-        // 4: one pass signature helper
         // 12: admin's specified trust information
         // 13: user id (textual name)
         // 14: public subkey (handled above)
         // 15: not defined
         // 16: not defined
         // 17: extended user id (non-textual name information, e.g. image)
-        4 | 12 | 13 | 17 => {
+        12 | 13 | 17 => {
             let len = match len {
                 Some(len) => len,
                 None => bail!("indeterminate length {} not supported", tag),
@@ -497,6 +508,30 @@ fn parse_literal_data<R: Read>(mut from: R) -> Result<PlainData, Error> {
         format,
         name,
         mtime,
+    })
+}
+
+// https://tools.ietf.org/html/rfc4880#section-5.4
+fn parse_one_pass_helper<R: Read>(mut from: R) -> Result<OnePassHelper, Error> {
+    match from.read_u8()? {
+        3 => (),
+        other => bail!("unsupported one pass version: {}", other),
+    };
+
+    let signature_type = sig_type(from.read_u8()?)?;
+    let hash_type = hash_alg(from.read_u8()?)?;
+    let pubkey_type = match from.read_u8()? {
+        1 => (),
+        other => bail!("not supported: one pass pub key: {}", other),
+    };
+    let pubkey_id = from.read_u64::<BigEndian>()?;
+    let _nested_flag = from.read_u8()?;
+
+    Ok(OnePassHelper {
+        signature_type,
+        hash_type,
+        pubkey_type,
+        pubkey_id,
     })
 }
 

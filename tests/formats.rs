@@ -3,9 +3,7 @@ extern crate gpgrv;
 
 use std::io;
 
-use failure::format_err;
 use failure::Error;
-use failure::ResultExt;
 use gpgrv::Keyring;
 
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
