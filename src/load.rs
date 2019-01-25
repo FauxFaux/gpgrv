@@ -68,7 +68,7 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
     let mut reader = iowrap::Pos::new(from);
     let mut packets = Vec::with_capacity(16);
     let mut data_header = None;
-    while packets::parse_packet(&mut reader, &mut |ev| match ev {
+    packets::parse_packets(&mut reader, &mut |ev| match ev {
         packets::Event::Packet(p) => {
             packets.push(p);
             Ok(())
@@ -82,8 +82,7 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
             Ok(())
         }
     })
-    .with_context(|_| format_err!("parsing after at around {}", reader.position()))?
-    {}
+    .with_context(|_| format_err!("parsing after at around {}", reader.position()))?;
     Ok(Doc {
         data_digest: None,
         data_header,

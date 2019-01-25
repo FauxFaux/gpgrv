@@ -32,7 +32,7 @@ impl Keyring {
         use packets::Event;
         use packets::Packet;
 
-        packets::parse_packet(&mut reader, &mut |ev| match ev {
+        packets::parse_packets(&mut reader, &mut |ev| match ev {
             Event::Packet(Packet::PubKey(key)) => {
                 last = Some(key.identity_hex());
                 let identity = key.identity().unwrap_or(0);

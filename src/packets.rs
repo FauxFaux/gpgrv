@@ -130,15 +130,26 @@ impl PubKeyPacket {
     }
 }
 
-pub fn parse_packet<R: Read, F>(mut from: R, into: &mut F) -> Result<bool, Error>
+pub fn parse_packets<R: Read, F>(mut from: R, into: &mut F) -> Result<bool, Error>
 where
     F: FnMut(Event) -> Result<(), Error>,
 {
-    let val = match from.read_u8() {
-        Ok(val) => val,
-        Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(false),
-        Err(other) => bail!(other),
-    };
+    loop {
+        let first_byte = match from.read_u8() {
+            Ok(val) => val,
+            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(other) => bail!(other),
+        };
+
+        parse_packet(first_byte, &mut from, into)?;
+    }
+}
+
+pub fn parse_packet<R: Read, F>(first_byte: u8, mut from: R, into: &mut F) -> Result<(), Error>
+where
+    F: FnMut(Event) -> Result<(), Error>,
+{
+    let val = first_byte;
 
     ensure!(is_bit_set(val, 7), "invalid packet tag");
     let tag;
@@ -216,7 +227,7 @@ where
         );
     }
 
-    Ok(true)
+    Ok(())
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {
@@ -400,7 +411,7 @@ where
         other => bail!("not recognised: {} compression mode", other),
     }
     let mut dec = libflate::deflate::Decoder::new(from);
-    while parse_packet(Box::new(&mut dec) as Box<Read>, into)? {}
+    parse_packets(Box::new(&mut dec) as Box<Read>, into)?;
     Ok(())
 }
 
