@@ -11,7 +11,7 @@ use crate::keyring::Keyring;
 use crate::packets;
 use crate::PublicKeySig;
 
-/// Verify the data in a clearsigned armour stream
+/// Verify the data in a document
 ///
 /// Note that some data may be written out before the signature is verified,
 /// and you must not process this until the method has returned success.

@@ -31,6 +31,8 @@ fn load() -> Result<(), Error> {
         gpgrv::read_doc(io::Cursor::new(file), &mut out)
             .with_context(|_| format_err!("reading {} {}", input, name))?;
 
+        drop_trailing_newline(&mut out);
+
         if name.starts_with("inline") {
             assert_eq!(
                 out,
@@ -49,6 +51,12 @@ fn load() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn drop_trailing_newline(v: &mut Vec<u8>) {
+    while !v.is_empty() && b'\n' == v[v.len() - 1] {
+        v.pop();
+    }
 }
 
 #[test]

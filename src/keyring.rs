@@ -32,7 +32,7 @@ impl Keyring {
         use packets::Event;
         use packets::Packet;
 
-        packets::parse_packet(&mut reader, |ev| match ev {
+        packets::parse_packet(&mut reader, &mut |ev| match ev {
             Event::Packet(Packet::PubKey(key)) => {
                 last = Some(key.identity_hex());
                 let identity = key.identity().unwrap_or(0);
@@ -41,7 +41,7 @@ impl Keyring {
                 Ok(())
             }
             Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::Signature(_)) => Ok(()),
-            Event::PlainData(_) => Err(err_msg("unsupported: loopback / plain-data")),
+            Event::PlainData(_, _) => Err(err_msg("unsupported: message data in keyring")),
         })
         .with_context(|_| {
             format_err!(

@@ -70,10 +70,10 @@ fn packets_key() -> Result<(), Error> {
 
 fn parse_to_list<R: Read>(from: R) -> Result<Vec<Packet>, Error> {
     let mut ret = Vec::new();
-    gpgrv::parse_packet(from, |ev| {
+    gpgrv::parse_packet(from, &mut |ev| {
         match ev {
             Event::Packet(p) => ret.push(p),
-            Event::PlainData(_) => panic!("data"),
+            Event::PlainData(_, _) => panic!("data"),
         }
         Ok(())
     })?;

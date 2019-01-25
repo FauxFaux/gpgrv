@@ -1,4 +1,3 @@
-use std::fmt;
 use std::io;
 use std::io::Read;
 use std::u16;
@@ -54,12 +53,19 @@ pub struct PubKeyPacket {
     pub math: PubKey,
 }
 
-pub struct Loopback {
-    inner: Box<Read>,
+#[derive(Debug)]
+pub enum PlainFormat {
+    Binary,
+    Text,
+    Utf8,
 }
 
 #[derive(Debug)]
-pub struct PlainData {}
+pub struct PlainData {
+    format: PlainFormat,
+    name: Vec<u8>,
+    mtime: u32,
+}
 
 #[derive(Debug)]
 pub enum Packet {
@@ -68,9 +74,9 @@ pub enum Packet {
     Signature(Signature),
 }
 
-pub enum Event {
+pub enum Event<'e> {
     Packet(Packet),
-    PlainData(PlainData),
+    PlainData(PlainData, &'e mut Read),
 }
 
 impl PubKeyPacket {
@@ -114,7 +120,7 @@ impl PubKeyPacket {
     }
 }
 
-pub fn parse_packet<R: Read, F>(mut from: R, mut into: F) -> Result<bool, Error>
+pub fn parse_packet<R: Read, F>(mut from: R, into: &mut F) -> Result<bool, Error>
 where
     F: FnMut(Event) -> Result<(), Error>,
 {
@@ -148,7 +154,7 @@ where
 
     let mut from = from.take(len.map(|v| u64::from(v)).unwrap_or(u64::max_value()));
 
-    /// https://tools.ietf.org/html/rfc4880#section-4.3
+    // https://tools.ietf.org/html/rfc4880#section-4.3
     match tag {
         0 => bail!("reserved tag: 0"),
         1 => bail!("not supported: public key encrypted session key"),
@@ -167,9 +173,8 @@ where
         9 => bail!("not supported: symmetrically encrypted data"),
         10 => bail!("not supported: marker"),
         11 => {
-            parse_literal_data(&mut from)?;
-            // TODO: actual build a packet
-            into(Event::Packet(Packet::IgnoredJunk))?;
+            let header = parse_literal_data(&mut from)?;
+            into(Event::PlainData(header, &mut from))?;
         }
         // 4: one pass signature helper
         // 12: admin's specified trust information
@@ -191,7 +196,7 @@ where
         other => bail!("not recognised: packet tag: {}, len: {:?}", other, len),
     };
 
-    if let Some(len) = len {
+    if len.is_some() {
         ensure!(
             0 == from.limit(),
             "parser bug: failed to read {} trailing bytes",
@@ -370,7 +375,7 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket, Error> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.6
-fn parse_compressed_packet<R: Read, F>(mut from: R, into: F) -> Result<(), Error>
+fn parse_compressed_packet<R: Read, F>(mut from: R, into: &mut F) -> Result<(), Error>
 where
     F: FnMut(Event) -> Result<(), Error>,
 {
@@ -383,7 +388,7 @@ where
         other => bail!("not recognised: {} compression mode", other),
     }
     let mut dec = libflate::deflate::Decoder::new(from);
-    parse_packet(Box::new(&mut dec) as Box<Read>, into)?;
+    while parse_packet(Box::new(&mut dec) as Box<Read>, into)? {}
     Ok(())
 }
 
@@ -475,13 +480,23 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.9
-fn parse_literal_data<R: Read>(mut from: R) -> Result<(), Error> {
-    let format = from.read_u8()?;
+fn parse_literal_data<R: Read>(mut from: R) -> Result<PlainData, Error> {
+    let format = match from.read_u8()? {
+        b'b' => PlainFormat::Binary,
+        b't' => PlainFormat::Text,
+        b'u' => PlainFormat::Utf8,
+        other => bail!("unrecognised plain format: {}", other),
+    };
+
     let name_len = from.read_u8()?;
-    from.read_exact(&mut vec![0u8; usize(name_len)])?;
+    let mut name = vec![0u8; usize(name_len)];
+    from.read_exact(&mut name)?;
     let mtime = from.read_u32::<BigEndian>()?;
-    io::copy(&mut from, &mut iowrap::Ignore::new())?;
-    Ok(())
+    Ok(PlainData {
+        format,
+        name,
+        mtime,
+    })
 }
 
 fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
@@ -575,12 +590,6 @@ fn be_u32(val: u32) -> [u8; 4] {
 fn is_bit_set(value: u8, bit_no: u8) -> bool {
     assert!(bit_no < 8);
     (value & (1 << bit_no)) == (1 << bit_no)
-}
-
-impl fmt::Debug for Loopback {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{loopback}}")
-    }
 }
 
 #[cfg(test)]
