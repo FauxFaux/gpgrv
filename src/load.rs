@@ -65,7 +65,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
 pub fn read_binary_doc<R: BufRead, W: Write>(from: R, _put_content: W) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
     let mut packets = Vec::with_capacity(16);
-    while let Some(packet) = packets::parse_packet(&mut reader, |ev| match ev {
+    while packets::parse_packet(&mut reader, |ev| match ev {
         packets::Event::Packet(p) => {
             packets.push(p);
             Ok(())
@@ -73,9 +73,7 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, _put_content: W) -> Result
         packets::Event::PlainData(_) => Err(err_msg("not supported: plain data")),
     })
     .with_context(|_| format_err!("parsing after at around {}", reader.position()))?
-    {
-        packets.push(packet);
-    }
+    {}
     Ok(Doc {
         digest: None,
         body_headers: HashMap::new(),

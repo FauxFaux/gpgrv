@@ -114,13 +114,13 @@ impl PubKeyPacket {
     }
 }
 
-pub fn parse_packet<R: Read, F>(mut from: R, into: F) -> Result<Option<Packet>, Error>
+pub fn parse_packet<R: Read, F>(mut from: R, mut into: F) -> Result<bool, Error>
 where
     F: FnMut(Event) -> Result<(), Error>,
 {
     let val = match from.read_u8() {
         Ok(val) => val,
-        Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(false),
         Err(other) => bail!(other),
     };
 
@@ -149,28 +149,27 @@ where
     let mut from = from.take(len.map(|v| u64::from(v)).unwrap_or(u64::max_value()));
 
     /// https://tools.ietf.org/html/rfc4880#section-4.3
-    let parsed = match tag {
+    match tag {
         0 => bail!("reserved tag: 0"),
         1 => bail!("not supported: public key encrypted session key"),
-        2 => Packet::Signature(
+        2 => into(Event::Packet(Packet::Signature(
             parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
-        ),
+        )))?,
         3 => bail!("not supported: symmetric key encrypted session key"),
         5 => bail!("not supported: secret key"),
         // 6: public key
         // 14: public subkey
-        6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
+        6 | 14 => into(Event::Packet(Packet::PubKey(parse_pubkey_packet(
+            &mut from,
+        )?)))?,
         7 => bail!("not supported: secret subkey"),
-        8 => unimplemented!(
-            "compression result: {:?}",
-            parse_compressed_packet(&mut from)?
-        ),
+        8 => parse_compressed_packet(&mut from, into)?,
         9 => bail!("not supported: symmetrically encrypted data"),
         10 => bail!("not supported: marker"),
         11 => {
             parse_literal_data(&mut from)?;
             // TODO: actual build a packet
-            Packet::IgnoredJunk
+            into(Event::Packet(Packet::IgnoredJunk))?;
         }
         // 4: one pass signature helper
         // 12: admin's specified trust information
@@ -185,7 +184,7 @@ where
                 None => bail!("indeterminate length {} not supported", tag),
             };
             from.read_exact(&mut vec![0u8; usize(len)])?;
-            Packet::IgnoredJunk
+            into(Event::Packet(Packet::IgnoredJunk))?;
         }
         18 => bail!("not supported: symmetrically encrypted and maced data"),
         19 => bail!("not supported: mac"),
@@ -200,7 +199,7 @@ where
         );
     }
 
-    Ok(Some(parsed))
+    Ok(true)
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {
@@ -371,7 +370,10 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket, Error> {
 }
 
 // https://tools.ietf.org/html/rfc4880#section-5.6
-fn parse_compressed_packet<R: Read>(mut from: R) -> Result<(), Error> {
+fn parse_compressed_packet<R: Read, F>(mut from: R, into: F) -> Result<(), Error>
+where
+    F: FnMut(Event) -> Result<(), Error>,
+{
     // https://tools.ietf.org/html/rfc4880#section-9.3
     match from.read_u8()? {
         0 => bail!("not supported: uncompressed compression"),
@@ -381,7 +383,7 @@ fn parse_compressed_packet<R: Read>(mut from: R) -> Result<(), Error> {
         other => bail!("not recognised: {} compression mode", other),
     }
     let mut dec = libflate::deflate::Decoder::new(from);
-    parse_packet(Box::new(&mut dec) as Box<Read>, |_| Ok(()))?;
+    parse_packet(Box::new(&mut dec) as Box<Read>, into)?;
     Ok(())
 }
 
