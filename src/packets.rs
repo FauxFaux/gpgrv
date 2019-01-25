@@ -146,42 +146,29 @@ where
         };
     }
 
-    let parsed = if let Some(len) = len {
-        let mut from = from.take(u64::from(len));
+    let mut from = from.take(len.map(|v| u64::from(v)).unwrap_or(u64::max_value()));
 
-        let parsed = parse_tag(&mut from, tag, Some(len))?;
-
-        ensure!(
-            0 == from.limit(),
-            "parser bug: failed to read {} trailing bytes",
-            from.limit()
-        );
-
-        parsed
-    } else {
-        parse_tag(from, tag, len)?
-    };
-
-    Ok(Some(parsed))
-}
-
-/// https://tools.ietf.org/html/rfc4880#section-4.3
-fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, Error> {
-    Ok(match tag {
+    /// https://tools.ietf.org/html/rfc4880#section-4.3
+    let parsed = match tag {
         0 => bail!("reserved tag: 0"),
         1 => bail!("not supported: public key encrypted session key"),
-        2 => Packet::Signature(parse_signature_packet(from).with_context(|_| "parsing signature")?),
+        2 => Packet::Signature(
+            parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
+        ),
         3 => bail!("not supported: symmetric key encrypted session key"),
         5 => bail!("not supported: secret key"),
         // 6: public key
         // 14: public subkey
-        6 | 14 => Packet::PubKey(parse_pubkey_packet(from)?),
+        6 | 14 => Packet::PubKey(parse_pubkey_packet(&mut from)?),
         7 => bail!("not supported: secret subkey"),
-        8 => unimplemented!("compression result: {:?}", parse_compressed_packet(from)?),
+        8 => unimplemented!(
+            "compression result: {:?}",
+            parse_compressed_packet(&mut from)?
+        ),
         9 => bail!("not supported: symmetrically encrypted data"),
         10 => bail!("not supported: marker"),
         11 => {
-            parse_literal_data(from)?;
+            parse_literal_data(&mut from)?;
             // TODO: actual build a packet
             Packet::IgnoredJunk
         }
@@ -203,7 +190,17 @@ fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, 
         18 => bail!("not supported: symmetrically encrypted and maced data"),
         19 => bail!("not supported: mac"),
         other => bail!("not recognised: packet tag: {}, len: {:?}", other, len),
-    })
+    };
+
+    if let Some(len) = len {
+        ensure!(
+            0 == from.limit(),
+            "parser bug: failed to read {} trailing bytes",
+            from.limit()
+        );
+    }
+
+    Ok(Some(parsed))
 }
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {
