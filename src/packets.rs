@@ -1,12 +1,13 @@
+use std::fmt;
 use std::io;
 use std::io::Read;
 use std::u16;
 use std::u32;
 
-use cast::usize;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
+use cast::usize;
 use digest::Digest;
 use digest::FixedOutput;
 use failure::Error;
@@ -53,11 +54,23 @@ pub struct PubKeyPacket {
     pub math: PubKey,
 }
 
+pub struct Loopback {
+    inner: Box<Read>,
+}
+
+#[derive(Debug)]
+pub struct PlainData {}
+
 #[derive(Debug)]
 pub enum Packet {
     IgnoredJunk,
     PubKey(PubKeyPacket),
     Signature(Signature),
+}
+
+pub enum Event {
+    Packet(Packet),
+    PlainData(PlainData),
 }
 
 impl PubKeyPacket {
@@ -101,7 +114,10 @@ impl PubKeyPacket {
     }
 }
 
-pub fn parse_packet<R: Read>(mut from: R) -> Result<Option<Packet>, Error> {
+pub fn parse_packet<R: Read, F>(mut from: R, into: F) -> Result<Option<Packet>, Error>
+where
+    F: FnMut(Event) -> Result<(), Error>,
+{
     let val = match from.read_u8() {
         Ok(val) => val,
         Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
@@ -154,9 +170,7 @@ fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, 
     Ok(match tag {
         0 => bail!("reserved tag: 0"),
         1 => bail!("not supported: public key encrypted session key"),
-        2 => Packet::Signature(
-            parse_signature_packet(from).with_context(|_| "parsing signature")?,
-        ),
+        2 => Packet::Signature(parse_signature_packet(from).with_context(|_| "parsing signature")?),
         3 => bail!("not supported: symmetric key encrypted session key"),
         5 => bail!("not supported: secret key"),
         // 6: public key
@@ -170,7 +184,7 @@ fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, 
             parse_literal_data(from)?;
             // TODO: actual build a packet
             Packet::IgnoredJunk
-        },
+        }
         // 4: one pass signature helper
         // 12: admin's specified trust information
         // 13: user id (textual name)
@@ -185,7 +199,7 @@ fn parse_tag<R: Read>(mut from: R, tag: u8, len: Option<u32>) -> Result<Packet, 
             };
             from.read_exact(&mut vec![0u8; usize(len)])?;
             Packet::IgnoredJunk
-        },
+        }
         18 => bail!("not supported: symmetrically encrypted and maced data"),
         19 => bail!("not supported: mac"),
         other => bail!("not recognised: packet tag: {}, len: {:?}", other, len),
@@ -370,9 +384,7 @@ fn parse_compressed_packet<R: Read>(mut from: R) -> Result<(), Error> {
         other => bail!("not recognised: {} compression mode", other),
     }
     let mut dec = libflate::deflate::Decoder::new(from);
-    while let Some(packet) = parse_packet(Box::new(&mut dec) as Box<Read>)? {
-        println!("inside compression: {:?}", packet);
-    }
+    parse_packet(Box::new(&mut dec) as Box<Read>, |_| Ok(()))?;
     Ok(())
 }
 
@@ -564,6 +576,12 @@ fn be_u32(val: u32) -> [u8; 4] {
 fn is_bit_set(value: u8, bit_no: u8) -> bool {
     assert!(bit_no < 8);
     (value & (1 << bit_no)) == (1 << bit_no)
+}
+
+impl fmt::Debug for Loopback {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{loopback}}")
+    }
 }
 
 #[cfg(test)]

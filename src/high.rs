@@ -2,9 +2,9 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use cast::u32;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
+use cast::u32;
 use failure::Error;
 
 use crate::keyring::Keyring;

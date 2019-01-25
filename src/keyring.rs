@@ -1,6 +1,7 @@
 use std::io;
 use std::io::Read;
 
+use failure::err_msg;
 use failure::Error;
 use failure::ResultExt;
 use iowrap;
@@ -28,27 +29,27 @@ impl Keyring {
         let mut reader = iowrap::Pos::new(io::BufReader::new(reader));
         let mut read = 0;
         let mut last = None;
-        loop {
-            match packets::parse_packet(&mut reader).with_context(|_| {
-                format_err!(
-                    "parsing after after {:?} at around {}",
-                    last,
-                    reader.position()
-                )
-            })? {
-                Some(packets::Packet::PubKey(key)) => {
-                    last = Some(key.identity_hex());
-                    let identity = key.identity().unwrap_or(0);
-                    self.keys.insert(key.math, identity);
-                }
-                Some(packets::Packet::IgnoredJunk) | Some(packets::Packet::Signature(_)) => {
-                    continue;
-                }
-                None => break,
-            }
+        use packets::Event;
+        use packets::Packet;
 
-            read += 1;
-        }
+        packets::parse_packet(&mut reader, |ev| match ev {
+            Event::Packet(Packet::PubKey(key)) => {
+                last = Some(key.identity_hex());
+                let identity = key.identity().unwrap_or(0);
+                self.keys.insert(key.math, identity);
+                read += 1;
+                Ok(())
+            }
+            Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::Signature(_)) => Ok(()),
+            Event::PlainData(_) => Err(err_msg("unsupported: loopback / plain-data")),
+        })
+        .with_context(|_| {
+            format_err!(
+                "parsing after after {:?} at around {}",
+                last,
+                reader.position()
+            )
+        })?;
 
         Ok(read)
     }

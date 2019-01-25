@@ -5,6 +5,7 @@ use std::io::Write;
 
 use failure::bail;
 use failure::ensure;
+use failure::err_msg;
 use failure::Error;
 use failure::ResultExt;
 
@@ -64,8 +65,14 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
 pub fn read_binary_doc<R: BufRead, W: Write>(from: R, _put_content: W) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
     let mut packets = Vec::with_capacity(16);
-    while let Some(packet) = packets::parse_packet(&mut reader)
-        .with_context(|_| format_err!("parsing after at around {}", reader.position()))?
+    while let Some(packet) = packets::parse_packet(&mut reader, |ev| match ev {
+        packets::Event::Packet(p) => {
+            packets.push(p);
+            Ok(())
+        }
+        packets::Event::PlainData(_) => Err(err_msg("not supported: plain data")),
+    })
+    .with_context(|_| format_err!("parsing after at around {}", reader.position()))?
     {
         packets.push(packet);
     }

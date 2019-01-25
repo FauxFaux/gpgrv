@@ -26,6 +26,7 @@ pub use crate::high::verify_message;
 pub use crate::keyring::Keyring;
 pub use crate::load::read_doc;
 pub use crate::packets::parse_packet;
+pub use crate::packets::Event;
 pub use crate::packets::Packet;
 
 #[derive(Debug)]

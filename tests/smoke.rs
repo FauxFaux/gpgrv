@@ -1,6 +1,11 @@
 extern crate gpgrv;
 
 use std::io;
+use std::io::Read;
+
+use failure::Error;
+use gpgrv::Event;
+use gpgrv::Packet;
 
 const EMPTY_SIG: &[u8] = include_bytes!("smoke/empty-message.inline-sig");
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
@@ -37,18 +42,22 @@ fn real_world_dizziest() {
 }
 
 #[test]
-fn packets_sig() {
+fn packets_sig() -> Result<(), Error> {
     use gpgrv::Packet::*;
-    match gpgrv::parse_packet(io::Cursor::new(EMPTY_SIG)).unwrap() {
+    match parse_to_list(io::Cursor::new(EMPTY_SIG))?
+        .into_iter()
+        .next()
+    {
         Some(Signature(sig)) => assert!(sig.issuer.is_some()),
         _ => panic!("wrong type of/missing packet"),
     }
+    Ok(())
 }
 
 #[test]
-fn packets_key() {
+fn packets_key() -> Result<(), Error> {
     use gpgrv::Packet::*;
-    match gpgrv::parse_packet(io::Cursor::new(FAUX_KEY)).unwrap() {
+    match parse_to_list(io::Cursor::new(FAUX_KEY))?.into_iter().next() {
         Some(PubKey(key)) => match key {
             _ => {
                 assert_eq!("b195e1c4779ba9b2", key.identity_hex());
@@ -56,4 +65,17 @@ fn packets_key() {
         },
         _ => panic!("wrong type of/missing packet"),
     }
+    Ok(())
+}
+
+fn parse_to_list<R: Read>(from: R) -> Result<Vec<Packet>, Error> {
+    let mut ret = Vec::new();
+    gpgrv::parse_packet(from, |ev| {
+        match ev {
+            Event::Packet(p) => ret.push(p),
+            Event::PlainData(_) => panic!("data"),
+        }
+        Ok(())
+    })?;
+    Ok(ret)
 }

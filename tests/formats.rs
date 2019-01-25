@@ -32,11 +32,17 @@ fn load() -> Result<(), Error> {
             .with_context(|_| format_err!("reading {} {}", input, name))?;
 
         if name.starts_with("inline") {
-            assert_eq!(out, match *input {
-                "dat" => &INPUT_DAT[..INPUT_DAT.len() - 1],
-                "txt" => &INPUT_TXT[..INPUT_TXT.len() - 1],
-                _ => unreachable!(),
-            }, "checking {} {}", input, name);
+            assert_eq!(
+                out,
+                match *input {
+                    "dat" => &INPUT_DAT[..INPUT_DAT.len() - 1],
+                    "txt" => &INPUT_TXT[..INPUT_TXT.len() - 1],
+                    _ => unreachable!(),
+                },
+                "checking {} {}",
+                input,
+                name
+            );
         } else {
             assert!(out.is_empty(), "detached has no data: {} {}", input, name);
         }
@@ -56,7 +62,10 @@ fn inline_armour() -> Result<(), Error> {
             &mut out,
             &keyring,
         )?;
-        assert_eq!(out, String::from_utf8(INPUT_TXT.to_vec())?.trim().as_bytes());
+        assert_eq!(
+            out,
+            String::from_utf8(INPUT_TXT.to_vec())?.trim().as_bytes()
+        );
     }
     #[cfg(todo)]
     {
