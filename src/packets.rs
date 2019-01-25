@@ -16,12 +16,13 @@ use crate::HashAlg;
 use crate::PubKey;
 use crate::PublicKeySig;
 
+#[derive(Copy, Clone, Debug)]
 enum PublicKeyAlg {
     Rsa,
     Dsa,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum SignatureType {
     Binary,
     CanonicalisedText,
@@ -36,7 +37,7 @@ pub enum SignatureType {
     CertificationRevocationSignature,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Signature {
     pub issuer: Option<[u8; 8]>,
     pub authenticated_data: Vec<u8>,
@@ -46,28 +47,28 @@ pub struct Signature {
     pub hash_hint: u16,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PubKeyPacket {
     version: u8,
     creation_time: u32,
     pub math: PubKey,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum PlainFormat {
     Binary,
     Text,
     Utf8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlainData {
     format: PlainFormat,
     name: Vec<u8>,
     mtime: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Packet {
     IgnoredJunk,
     PubKey(PubKeyPacket),

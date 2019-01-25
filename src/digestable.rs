@@ -2,7 +2,7 @@ use digest::FixedOutput;
 use digest::Input;
 use failure::Error;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Digestable {
     Sha1(::sha1::Sha1),
     Sha256(::sha2::Sha256),

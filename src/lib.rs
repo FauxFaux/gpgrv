@@ -29,13 +29,13 @@ pub use crate::packets::parse_packet;
 pub use crate::packets::Event;
 pub use crate::packets::Packet;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PublicKeySig {
     Rsa(Vec<u8>),
     Dsa { r: Vec<u8>, s: Vec<u8> },
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PubKey {
     Rsa {
         n: Vec<u8>,
@@ -62,7 +62,7 @@ pub enum PubKey {
     },
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum HashAlg {
     Sha1,
     Sha224,

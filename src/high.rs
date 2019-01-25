@@ -48,7 +48,7 @@ pub fn verify_message<R: BufRead, W: Write>(
         other => bail!("invalid signature type in armour: {:?}", other),
     };
 
-    let digest = match armour_removed.digest.as_mut() {
+    let digest = match armour_removed.data_digest.as_mut() {
         Some(d) => d,
         None => bail!("document wasn't a message (i.e. there was no body)"),
     };
