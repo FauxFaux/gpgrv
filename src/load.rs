@@ -46,7 +46,6 @@ pub fn read_doc<R, B: BufferedReader<R>, W: Write>(
     }
 }
 
-
 fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
     from: B,
     mut put_content: W,

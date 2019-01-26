@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::io::Write;
 use std::io;
+use std::io::Write;
 
 use base64;
 use buffered_reader::BufferedReader;
@@ -12,11 +12,11 @@ use failure::Error;
 use failure::ResultExt;
 
 use crate::digestable::Digestable;
-use crate::packets::SignatureType;
+use crate::load;
 use crate::packets;
 use crate::packets::Event;
 use crate::packets::Packet;
-use crate::load;
+use crate::packets::SignatureType;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
@@ -176,9 +176,7 @@ fn canonicalise<R, B: BufferedReader<R>, W: Write>(
     }
 }
 
-fn parse_armoured_signature_body<R, B: BufferedReader<R>>(
-    mut from: B,
-) -> Result<Vec<u8>, Error> {
+fn parse_armoured_signature_body<R, B: BufferedReader<R>>(mut from: B) -> Result<Vec<u8>, Error> {
     let _sig_headers = take_headers(&mut from)?;
 
     let mut signature = String::with_capacity(1024);

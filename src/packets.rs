@@ -652,6 +652,17 @@ fn is_bit_set(value: u8, bit_no: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+    use std::io::Read;
+
+    use failure::Error;
+
+    use super::parse_packets;
+    use super::Event;
+    use super::Packet;
+
+    const EMPTY_SIG: &[u8] = include_bytes!("../tests/smoke/empty-message.inline-sig");
+    const FAUX_KEY: &[u8] = include_bytes!("../tests/faux.pubkey");
+
     #[test]
     fn mpi() {
         use super::read_mpi;
@@ -685,5 +696,39 @@ mod tests {
         assert_eq!(6, top_bit(126));
         assert_eq!(6, top_bit(127));
         assert_eq!(7, top_bit(128));
+    }
+
+    #[test]
+    fn packets_sig() -> Result<(), Error> {
+        match parse_to_list(Cursor::new(EMPTY_SIG))?.into_iter().next() {
+            Some(Packet::Signature(sig)) => assert!(sig.issuer.is_some()),
+            _ => panic!("wrong type of/missing packet"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn packets_key() -> Result<(), Error> {
+        match parse_to_list(Cursor::new(FAUX_KEY))?.into_iter().next() {
+            Some(Packet::PubKey(key)) => match key {
+                _ => {
+                    assert_eq!("b195e1c4779ba9b2", key.identity_hex());
+                }
+            },
+            _ => panic!("wrong type of/missing packet"),
+        }
+        Ok(())
+    }
+
+    fn parse_to_list<R: Read>(from: R) -> Result<Vec<Packet>, Error> {
+        let mut ret = Vec::new();
+        parse_packets(from, &mut |ev| {
+            match ev {
+                Event::Packet(p) => ret.push(p),
+                Event::PlainData(_, _) => panic!("data"),
+            }
+            Ok(())
+        })?;
+        Ok(ret)
     }
 }
