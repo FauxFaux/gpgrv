@@ -15,7 +15,7 @@ const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("smoke/real-world-dizziest.gpg
 #[test]
 fn split() {
     gpgrv::read_doc(
-        io::Cursor::new(HELLO_WORLD.as_bytes()),
+        buffered_reader::BufferedReaderMemory::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
     )
     .unwrap();
@@ -24,9 +24,11 @@ fn split() {
 #[test]
 fn verify() {
     let mut keyring = gpgrv::Keyring::new();
-    keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
+    keyring
+        .append_keys_from(buffered_reader::BufferedReaderMemory::new(FAUX_KEY))
+        .unwrap();
     gpgrv::verify_message(
-        io::Cursor::new(HELLO_WORLD.as_bytes()),
+        buffered_reader::BufferedReaderMemory::new(HELLO_WORLD.as_bytes()),
         io::Cursor::new(vec![]),
         &keyring,
     )

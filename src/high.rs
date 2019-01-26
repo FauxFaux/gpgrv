@@ -1,7 +1,7 @@
 use std::io;
-use std::io::BufRead;
 use std::io::Write;
 
+use buffered_reader::BufferedReader;
 use failure::ensure;
 use failure::err_msg;
 use failure::format_err;
@@ -29,8 +29,8 @@ use crate::keyring::Keyring;
 ///     std::io::copy(&mut temp, &mut stdout()).unwrap();
 /// }
 /// ```
-pub fn verify_message<R: BufRead, W: Write>(
-    from: R,
+pub fn verify_message<R, B: BufferedReader<R>, W: Write>(
+    from: B,
     to: W,
     keyring: &Keyring,
 ) -> Result<(), Error> {

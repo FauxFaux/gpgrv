@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::io::BufRead;
 use std::io::Write;
 
 use base64;
+use buffered_reader::BufferedReader;
 use failure::bail;
 use failure::ensure;
 use failure::err_msg;
@@ -11,7 +11,7 @@ use failure::Error;
 use failure::ResultExt;
 
 use crate::digestable::Digestable;
-use crate::load::ShortLine;
+use crate::load::read_short_line;
 use crate::packets::SignatureType;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
@@ -24,8 +24,8 @@ pub struct Message {
     pub block: Vec<u8>,
 }
 
-pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
-    mut from: R,
+pub fn parse_armoured_signed_message<R, B: BufferedReader<R>, W: Write>(
+    mut from: B,
     to: W,
 ) -> Result<Message, Error> {
     let body_headers = take_headers(&mut from)?;
@@ -42,7 +42,7 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
 
     canonicalise(&mut from, to, &mut digest)?;
 
-    let escaped_line = String::from_utf8(from.read_short_line()?)?;
+    let escaped_line = String::from_utf8(read_short_line(&mut from)?)?;
 
     ensure!(
         escaped_line == BEGIN_SIGNATURE,
@@ -60,23 +60,22 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
     })
 }
 
-fn canonicalise<R: BufRead, W: Write>(
-    mut from: R,
+fn canonicalise<R, B: BufferedReader<R>, W: Write>(
+    from: &mut B,
     mut to: W,
     digest: &mut Digestable,
 ) -> Result<(), Error> {
     {
         // first line is escaped? Handle it directly.
 
-        from.fill_buf()?;
-        let buf = from.fill_buf()?;
+        let buf = from.data(2)?;
         if buf.starts_with(b"- ") {
             from.consume(b"- ".len());
         }
     }
 
     loop {
-        let buf = from.fill_buf()?;
+        let buf = from.data(8 * 1024)?;
         if buf.is_empty() {
             bail!("unexpected EOF in message body");
         }
@@ -99,8 +98,7 @@ fn canonicalise<R: BufRead, W: Write>(
         }
 
         // has at least "\n-"
-        let buf = from.fill_buf()?;
-        assert!(buf.len() >= 2);
+        let buf = from.data_hard(3)?;
         assert_eq!(b'\n', buf[0]);
 
         if buf[1] != b'-' {
@@ -111,13 +109,6 @@ fn canonicalise<R: BufRead, W: Write>(
             digest.process(b"\r\n");
             continue;
         }
-
-        // has at least "\n--" or "\n- "
-        let buf = from.fill_buf()?;
-
-        assert!(buf.len() >= 3);
-        assert_eq!(b'\n', buf[0]);
-        assert_eq!(b'-', buf[1]);
 
         match buf[2] {
             b'-' => {
@@ -143,20 +134,22 @@ fn canonicalise<R: BufRead, W: Write>(
     }
 }
 
-pub fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
+pub fn parse_armoured_signature_body<R, B: BufferedReader<R>>(
+    mut from: B,
+) -> Result<Vec<u8>, Error> {
     let _sig_headers = take_headers(&mut from)?;
 
     let mut signature = String::with_capacity(1024);
 
     loop {
-        let line = String::from_utf8(from.read_short_line()?)?;
+        let line = String::from_utf8(read_short_line(&mut from)?)?;
         let line = line.trim();
 
         // checksum
         if line.len() == 5 && line.starts_with('=') {
             // TODO: Validate checksum? It's not part of the security model in any way.
 
-            let line = String::from_utf8(from.read_short_line()?)?;
+            let line = String::from_utf8(read_short_line(&mut from)?)?;
 
             ensure!(
                 END_MESSAGE == line,
@@ -176,10 +169,10 @@ pub fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>,
         .with_context(|_| format_err!("base64 decoding signature: {:?}", signature))?)
 }
 
-fn take_headers<R: BufRead>(mut from: R) -> Result<HashMap<String, String>, Error> {
+fn take_headers<R, B: BufferedReader<R>>(from: &mut B) -> Result<HashMap<String, String>, Error> {
     let mut headers = HashMap::new();
     loop {
-        let header = String::from_utf8(from.read_short_line()?)?;
+        let header = String::from_utf8(read_short_line(from)?)?;
         let header = header.trim();
         if header.is_empty() {
             break;
@@ -201,7 +194,6 @@ fn take_headers<R: BufRead>(mut from: R) -> Result<HashMap<String, String>, Erro
 mod tests {
     use byteorder::ByteOrder;
     use byteorder::BE;
-    use std::io;
 
     #[test]
     fn canon_one_line() {
@@ -234,7 +226,12 @@ mod tests {
     fn assert_canon(input: &[u8], wanted_output: &[u8], wanted_digested: &[u8]) {
         let mut actual_output = Vec::with_capacity(input.len() * 2);
         let mut digest = crate::Digestable::sha1();
-        super::canonicalise(io::Cursor::new(input), &mut actual_output, &mut digest).unwrap();
+        super::canonicalise(
+            &mut buffered_reader::BufferedReaderMemory::new(input),
+            &mut actual_output,
+            &mut digest,
+        )
+        .unwrap();
         let actual_hash = BE::read_u64(&digest.hash());
 
         if wanted_output != actual_output.as_slice() {

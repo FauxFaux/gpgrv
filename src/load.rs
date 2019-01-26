@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::io;
-use std::io::BufRead;
 use std::io::Write;
 
+use buffered_reader::BufferedReader;
 use failure::bail;
 use failure::ensure;
 use failure::err_msg;
@@ -31,9 +31,12 @@ pub struct Body {
     pub header: Option<packets::PlainData>,
 }
 
-pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
+pub fn read_doc<R, B: BufferedReader<R>, W: Write>(
+    mut from: B,
+    put_content: W,
+) -> Result<Doc, Error> {
     let first_byte = {
-        let head = from.fill_buf()?;
+        let head = from.data(1)?;
         ensure!(!head.is_empty(), "empty file");
         head[0]
     };
@@ -44,12 +47,16 @@ pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc
     }
 }
 
-pub fn read_armoured_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
-    match String::from_utf8(from.read_short_line()?)?.trim() {
+pub fn read_armoured_doc<R, B: BufferedReader<R>, W: Write>(
+    mut from: B,
+    put_content: W,
+) -> Result<Doc, Error> {
+    match String::from_utf8(read_short_line(&mut from)?)?.trim() {
         armour::BEGIN_SIGNED_MESSAGE => {
             let msg = armour::parse_armoured_signed_message(from, put_content)?;
 
-            let signatures = read_signatures_only(io::Cursor::new(msg.block))?;
+            let signatures =
+                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&msg.block))?;
 
             Ok(Doc {
                 body: Some(Body {
@@ -63,7 +70,8 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> R
         armour::BEGIN_SIGNATURE => {
             let block = armour::parse_armoured_signature_body(from)?;
 
-            let signatures = read_signatures_only(io::Cursor::new(block))?;
+            let signatures =
+                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&block))?;
 
             Ok(Doc {
                 body: None,
@@ -74,7 +82,10 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> R
     }
 }
 
-pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Result<Doc, Error> {
+pub fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
+    from: B,
+    mut put_content: W,
+) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
     let mut signatures = Vec::with_capacity(16);
     let mut body = None;
@@ -138,7 +149,9 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
     Ok(Doc { body, signatures })
 }
 
-pub fn read_signatures_only<R: BufRead>(from: R) -> Result<Vec<packets::Signature>, Error> {
+pub fn read_signatures_only<R, B: BufferedReader<R>>(
+    from: B,
+) -> Result<Vec<packets::Signature>, Error> {
     let mut signatures = Vec::new();
 
     packets::parse_packets(from, &mut |ev| match ev {
@@ -157,38 +170,20 @@ pub fn read_signatures_only<R: BufRead>(from: R) -> Result<Vec<packets::Signatur
     Ok(signatures)
 }
 
-pub trait ShortLine {
-    fn read_short_line(&mut self) -> Result<Vec<u8>, io::Error>;
-}
-
-impl<B: BufRead> ShortLine for B {
-    fn read_short_line(&mut self) -> Result<Vec<u8>, io::Error> {
-        let mut last_seen = 0;
-
-        loop {
-            let buf = self.fill_buf()?;
-
-            // we didn't get any longer, so the file has given up feeding us
-            if buf.len() == last_seen {
-                return Err(io::ErrorKind::UnexpectedEof.into());
-            }
-
-            // can we see the end in the new bit?
-            if let Some(end) = memchr::memchr(b'\n', &buf[last_seen..]) {
-                let excluding_new_line = last_seen + end;
-                let ret = buf[..excluding_new_line].to_vec();
-                self.consume(excluding_new_line + 1);
-                return Ok(ret);
-            }
-
-            last_seen = buf.len();
-        }
+pub fn read_short_line<R, B: BufferedReader<R>>(from: &mut B) -> Result<Vec<u8>, io::Error> {
+    let buf = from.data(4096)?;
+    if let Some(end) = memchr::memchr(b'\n', &buf) {
+        let ret = buf[..end].to_vec();
+        from.consume(end + 1);
+        return Ok(ret);
     }
+
+    Err(io::ErrorKind::UnexpectedEof.into())
 }
 
 #[test]
 fn short_line() {
-    let mut r = io::Cursor::new(b"foo\nbar\n");
-    assert_eq!(b"foo", r.read_short_line().unwrap().as_slice());
-    assert_eq!(b"bar", r.read_short_line().unwrap().as_slice());
+    let mut r = buffered_reader::BufferedReaderMemory::new(b"foo\nbar\n");
+    assert_eq!(b"foo", read_short_line(&mut r).unwrap().as_slice());
+    assert_eq!(b"bar", read_short_line(&mut r).unwrap().as_slice());
 }

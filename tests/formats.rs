@@ -22,7 +22,7 @@ const INPUT_DAT: &[u8] = include_bytes!("formats/input.dat");
 
 fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     let mut out = Vec::with_capacity(8096);
-    let doc = gpgrv::read_doc(io::Cursor::new(file), &mut out).unwrap();
+    let doc = gpgrv::read_doc(buffered_reader::BufferedReaderMemory::new(file), &mut out).unwrap();
 
     // TODO: we currently don't get the same ending new line behaviour for:
     // TODO: * test_dat_inline_armour
