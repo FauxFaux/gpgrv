@@ -26,7 +26,7 @@ pub struct Message {
 
 pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
     mut from: R,
-    mut to: W,
+    to: W,
 ) -> Result<Message, Error> {
     let body_headers = take_headers(&mut from)?;
 
@@ -40,6 +40,31 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
 
     let sig_type = SignatureType::CanonicalisedText;
 
+    canonicalise(&mut from, to, &mut digest)?;
+
+    let escaped_line = String::from_utf8(from.read_short_line()?)?;
+
+    ensure!(
+        escaped_line == BEGIN_SIGNATURE,
+        "invalid escaped line, should be a signature start: {:?}",
+        escaped_line
+    );
+
+    let block = parse_armoured_signature_body(from)
+        .with_context(|_| err_msg("reading signature body after message"))?;
+
+    Ok(Message {
+        digest,
+        sig_type,
+        block,
+    })
+}
+
+fn canonicalise<R: BufRead, W: Write>(
+    mut from: R,
+    mut to: W,
+    digest: &mut Digestable,
+) -> Result<(), Error> {
     loop {
         let buf = from.fill_buf()?;
         if buf.is_empty() {
@@ -89,7 +114,7 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
                 to.write_all(b"\n")?;
                 // the trailing newline is not part of the message for digest purposes
                 from.consume("\n".len());
-                break;
+                return Ok(());
             }
 
             b' ' => {
@@ -106,23 +131,6 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
             ),
         }
     }
-
-    let escaped_line = String::from_utf8(from.read_short_line()?)?;
-
-    ensure!(
-        escaped_line == BEGIN_SIGNATURE,
-        "invalid escaped line, should be a signature start: {:?}",
-        escaped_line
-    );
-
-    let block = parse_armoured_signature_body(from)
-        .with_context(|_| err_msg("reading signature body after message"))?;
-
-    Ok(Message {
-        digest,
-        sig_type,
-        block,
-    })
 }
 
 pub fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
@@ -177,4 +185,69 @@ fn take_headers<R: BufRead>(mut from: R) -> Result<HashMap<String, String>, Erro
     }
 
     Ok(headers)
+}
+
+#[cfg(test)]
+mod tests {
+    use byteorder::ByteOrder;
+    use byteorder::BE;
+    use std::io;
+
+    #[test]
+    fn canon_one_line() {
+        assert_canon(b"foo\n--", b"foo\n", b"foo")
+    }
+
+    #[test]
+    fn canon_two_lines() {
+        assert_canon(b"foo\nbar\n--", b"foo\nbar\n", b"foo\r\nbar")
+    }
+
+    #[test]
+    fn canon_escaped() {
+        assert_canon(
+            b"foo\nbar\n- --baz\n--",
+            b"foo\nbar\n--baz\n",
+            b"foo\r\nbar\r\n--baz",
+        )
+    }
+
+    #[test]
+    fn canon_escaped_first_line() {
+        assert_canon(
+            b"- --foo\nbar\n- --baz\n--",
+            b"--foo\nbar\n--baz\n",
+            b"--foo\r\nbar\r\n--baz",
+        )
+    }
+
+    fn assert_canon(input: &[u8], wanted_output: &[u8], wanted_digested: &[u8]) {
+        let mut actual_output = Vec::with_capacity(input.len() * 2);
+        let mut digest = crate::Digestable::sha1();
+        super::canonicalise(io::Cursor::new(input), &mut actual_output, &mut digest).unwrap();
+        let actual_hash = BE::read_u64(&digest.hash());
+
+        if wanted_output != actual_output.as_slice() {
+            let actual_string = String::from_utf8_lossy(&actual_output);
+            let wanted_string = String::from_utf8_lossy(wanted_output);
+
+            assert_eq!(wanted_string, actual_string);
+            assert_eq!(wanted_output, actual_output.as_slice());
+        }
+
+        assert_eq!(sha1(wanted_digested), actual_hash);
+    }
+
+    fn sha1(data: &[u8]) -> u64 {
+        let mut digest = crate::Digestable::sha1();
+        digest.process(data);
+        BE::read_u64(&digest.hash())
+    }
+
+    #[test]
+    fn check_sha1() {
+        // % printf 'foo\r\nbar' | sha1sum
+        //           ad489cb3657d52202c7f1709513d2cf1e0f9162a
+        assert_eq!(0xad489cb3657d5220, sha1(b"foo\r\nbar"));
+    }
 }
