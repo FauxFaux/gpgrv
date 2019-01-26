@@ -6,9 +6,9 @@ use std::io::Write;
 use failure::bail;
 use failure::ensure;
 use failure::err_msg;
+use failure::format_err;
 use failure::Error;
 use failure::ResultExt;
-use failure::format_err;
 
 use crate::armour;
 use crate::digestable::Digestable;
@@ -16,6 +16,7 @@ use crate::packets;
 use crate::packets::Event;
 use crate::packets::Packet;
 use crate::packets::Signature;
+use crate::packets::SignatureType;
 
 #[derive(Clone, Debug)]
 pub struct Doc {
@@ -26,6 +27,7 @@ pub struct Doc {
 #[derive(Clone, Debug)]
 pub struct Body {
     pub digest: Digestable,
+    pub sig_type: SignatureType,
     pub header: Option<packets::PlainData>,
 }
 
@@ -57,6 +59,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
             Ok(Doc {
                 body: Some(Body {
                     digest: msg.digest,
+                    sig_type: SignatureType::CanonicalisedText,
                     header: None,
                 }),
                 signatures,
@@ -101,7 +104,7 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
                 };
 
                 use super::HashAlg;
-                let mut digestable = match hash_type {
+                let mut digest = match hash_type {
                     HashAlg::Sha1 => Digestable::sha1(),
                     HashAlg::Sha256 => Digestable::sha256(),
                     HashAlg::Sha512 => Digestable::sha512(),
@@ -122,12 +125,13 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
                         break;
                     }
                     let buf = &buf[..read];
-                    digestable.process(buf);
+                    digest.process(buf);
                     put_content.write_all(buf)?;
                 }
 
                 body = Some(Body {
-                    digest: digestable,
+                    digest,
+                    sig_type,
                     header: Some(header),
                 });
             }

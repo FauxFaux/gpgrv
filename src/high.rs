@@ -3,11 +3,10 @@ use std::io::BufRead;
 use std::io::Write;
 
 use failure::err_msg;
+use failure::ensure;
 use failure::Error;
-use failure::bail;
 
 use crate::keyring::Keyring;
-use crate::packets;
 
 /// Verify the data in a document
 ///
@@ -34,22 +33,15 @@ pub fn verify_message<R: BufRead, W: Write>(
     to: W,
     keyring: &Keyring,
 ) -> Result<(), Error> {
-    let doc = crate::load::read_doc(from, io::BufWriter::new(to))?;
-
-    // TODO: test all signatures
-    let sig = match doc.signatures.into_iter().next() {
-        Some(s) => s,
-        None => bail!("no signature in signature stream"),
-    };
-
-    match sig.sig_type {
-        packets::SignatureType::CanonicalisedText => {}
-        other => bail!("invalid signature type in armour: {:?}", other),
-    };
+    let doc = crate::read_doc(from, io::BufWriter::new(to))?;
 
     let body = doc
         .body
         .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
 
-    crate::verify(keyring, &sig, body.digest)
+    let signatures_of_correct_type: Vec<_> = doc.signatures.into_iter().filter(|sig| body.sig_type == sig.sig_type).collect();
+
+    ensure!(!signatures_of_correct_type.is_empty(), "no signatures are of the correct type");
+
+    crate::any_signature_valid(keyring, &signatures_of_correct_type, &body.digest)
 }

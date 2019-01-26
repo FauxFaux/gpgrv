@@ -1,10 +1,10 @@
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use cast::u32;
-use failure::Error;
 use failure::bail;
-use failure::format_err;
 use failure::ensure;
+use failure::format_err;
+use failure::Error;
 
 use crate::rsa;
 use crate::Digestable;
@@ -13,7 +13,26 @@ use crate::PubKey;
 use crate::PublicKeySig;
 use crate::Signature;
 
-pub fn verify(keyring: &Keyring, sig: &Signature, mut digest: Digestable) -> Result<(), Error> {
+pub fn any_signature_valid<'s, S: IntoIterator<Item = &'s Signature>>(
+    keyring: &Keyring,
+    sigs: S,
+    digest: &Digestable,
+) -> Result<(), Error> {
+
+    for sig in sigs {
+        if single_signature_valid(keyring, sig, digest.clone()).is_ok() {
+            return Ok(());
+        }
+    }
+
+    bail!("none of the signatures were valid")
+}
+
+pub fn single_signature_valid(
+    keyring: &Keyring,
+    sig: &Signature,
+    mut digest: Digestable,
+) -> Result<(), Error> {
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len())?);
 
@@ -37,7 +56,7 @@ pub fn verify(keyring: &Keyring, sig: &Signature, mut digest: Digestable) -> Res
     for key in keyring.keys_with_id(BigEndian::read_u64(
         &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
     )) {
-        if check_signature(key, &sig.sig, &padded_hash).is_ok() {
+        if single_signature_key_valid(key, &sig.sig, &padded_hash).is_ok() {
             return Ok(());
         }
     }
@@ -45,7 +64,11 @@ pub fn verify(keyring: &Keyring, sig: &Signature, mut digest: Digestable) -> Res
     bail!("no known keys could validate the signature")
 }
 
-fn check_signature(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<(), Error> {
+fn single_signature_key_valid(
+    key: &PubKey,
+    sig: &PublicKeySig,
+    padded_hash: &[u8],
+) -> Result<(), Error> {
     match *key {
         PubKey::Rsa { ref n, ref e } => match *sig {
             PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),

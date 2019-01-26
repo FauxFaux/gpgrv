@@ -40,6 +40,10 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     let mut keyring = Keyring::new();
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
 
+    if let Some(body) = doc.body {
+        gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)?;
+    }
+
     Ok(())
 }
 

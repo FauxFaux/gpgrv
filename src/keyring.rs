@@ -2,10 +2,10 @@ use std::io;
 use std::io::Read;
 
 use failure::err_msg;
+use failure::format_err;
 use failure::Error;
 use failure::ResultExt;
 use iowrap;
-use failure::format_err;
 
 use crate::hash_multimap::HashMultiMap;
 use crate::packets;

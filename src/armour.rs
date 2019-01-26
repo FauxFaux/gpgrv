@@ -3,13 +3,14 @@ use std::io::BufRead;
 use std::io::Lines;
 use std::io::Write;
 
-use crate::digestable::Digestable;
-use failure::Error;
-use failure::bail;
-use failure::format_err;
-use failure::ensure;
-
 use base64;
+use failure::bail;
+use failure::ensure;
+use failure::format_err;
+use failure::Error;
+
+use crate::digestable::Digestable;
+use crate::packets::SignatureType;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
@@ -17,6 +18,7 @@ const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 pub struct Message {
     pub digest: Digestable,
+    pub sig_type: SignatureType,
     pub block: Vec<u8>,
 }
 
@@ -34,6 +36,7 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
         None => bail!("'Hash' header is mandatory"),
     };
 
+    let sig_type = SignatureType::CanonicalisedText;
     let mut first = true;
 
     loop {
@@ -70,7 +73,11 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
 
     let block = parse_armoured_signature_body(lines)?;
 
-    Ok(Message { digest, block })
+    Ok(Message {
+        digest,
+        sig_type,
+        block,
+    })
 }
 
 pub fn parse_armoured_signature_body<R: BufRead>(mut lines: Lines<R>) -> Result<Vec<u8>, Error> {

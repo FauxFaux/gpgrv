@@ -10,10 +10,10 @@ use cast::u64;
 use cast::usize;
 use digest::Digest;
 use digest::FixedOutput;
-use failure::Error;
-use failure::ResultExt;
 use failure::bail;
 use failure::ensure;
+use failure::Error;
+use failure::ResultExt;
 
 use crate::HashAlg;
 use crate::PubKey;
