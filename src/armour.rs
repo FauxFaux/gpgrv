@@ -65,6 +65,16 @@ fn canonicalise<R: BufRead, W: Write>(
     mut to: W,
     digest: &mut Digestable,
 ) -> Result<(), Error> {
+    {
+        // first line is escaped? Handle it directly.
+
+        from.fill_buf()?;
+        let buf = from.fill_buf()?;
+        if buf.starts_with(b"- ") {
+            from.consume(b"- ".len());
+        }
+    }
+
     loop {
         let buf = from.fill_buf()?;
         if buf.is_empty() {
