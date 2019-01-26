@@ -79,12 +79,13 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
     let mut reader = iowrap::Pos::new(from);
     let mut signatures = Vec::with_capacity(16);
     let mut body = None;
-    let mut hash_types = HashSet::new();
+    let mut body_modes = HashSet::with_capacity(4);
+
     packets::parse_packets(&mut reader, &mut |ev| {
         match ev {
             Event::Packet(Packet::Signature(sig)) => signatures.push(sig),
             Event::Packet(Packet::OnePassHelper(help)) => {
-                hash_types.insert(help.hash_type);
+                body_modes.insert((help.signature_type, help.hash_type));
             }
             Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::PubKey(_)) => (),
             Event::PlainData(header, from) => {
@@ -92,20 +93,38 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
                     bail!("not supported: multiple plain data segments");
                 }
 
-                let hash_type = *match hash_types.len() {
-                    0 => bail!("no hash type hint provided before document"),
-                    1 => hash_types.iter().next().unwrap(),
-                    _ => bail!("unsupported: multiple hash type hints"),
+                let (sig_type, hash_type) = *match body_modes.len() {
+                    0 => bail!("no body mode hint provided before document"),
+                    1 => body_modes.iter().next().unwrap(),
+                    _ => bail!("unsupported: multiple body mode hints: {:?}", body_modes),
                 };
 
-                let digestable = match hash_type {
-                    super::HashAlg::Sha1 => Digestable::sha1(),
-                    super::HashAlg::Sha256 => Digestable::sha256(),
-                    super::HashAlg::Sha512 => Digestable::sha512(),
+                use super::HashAlg;
+                let mut digestable = match hash_type {
+                    HashAlg::Sha1 => Digestable::sha1(),
+                    HashAlg::Sha256 => Digestable::sha256(),
+                    HashAlg::Sha512 => Digestable::sha512(),
                     other => bail!("unsupported binary hash function: {:?}", other),
                 };
 
-                io::copy(from, &mut put_content)?;
+                use packets::SignatureType;
+                match sig_type {
+                    SignatureType::Binary => (),
+                    other => bail!("unsupported signature type in binary doc: {:?}", other),
+                };
+
+                let mut buf = [0u8; 8 * 1024];
+
+                loop {
+                    let read = from.read(&mut buf)?;
+                    if 0 == read {
+                        break;
+                    }
+                    let buf = &buf[..read];
+                    digestable.process(buf);
+                    put_content.write_all(buf)?;
+                }
+
                 body = Some(Body {
                     digest: digestable,
                     header: Some(header),

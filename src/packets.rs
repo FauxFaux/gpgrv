@@ -23,7 +23,7 @@ enum PublicKeyAlg {
     Dsa,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SignatureType {
     Binary,
     CanonicalisedText,

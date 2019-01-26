@@ -20,6 +20,9 @@ mod mpi;
 mod packets;
 mod rsa;
 
+use byteorder::ByteOrder;
+use cast::u32;
+use byteorder::BigEndian;
 use failure::Error;
 
 pub use crate::high::verify_message;
@@ -29,6 +32,7 @@ pub use crate::packets::parse_packet;
 pub use crate::packets::parse_packets;
 pub use crate::packets::Event;
 pub use crate::packets::Packet;
+pub use crate::packets::Signature;
 
 #[derive(Clone, Debug)]
 pub enum PublicKeySig {
@@ -75,10 +79,31 @@ pub enum HashAlg {
     RipeMd,
 }
 
-pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<(), Error> {
+pub fn verify(key: &PubKey, sig: &Signature, mut digest: digestable::Digestable) -> Result<(), Error> {
+
+    digest.process(&sig.authenticated_data);
+    digest.process(&make_tail(sig.authenticated_data.len())?);
+
+    let hash = digest.clone().hash();
+
+    {
+        let actual = BigEndian::read_u16(&hash);
+        ensure!(
+            actual == sig.hash_hint,
+            "digest hint doesn't match; digest is probably wrong, exp: {:04x}, act: {:04x}",
+            sig.hash_hint,
+            actual,
+        );
+    }
+
+    let padded = match sig.sig {
+        PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
+        _ => bail!("unsupported signature"),
+    };
+
     match *key {
-        PubKey::Rsa { ref n, ref e } => match *sig {
-            PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
+        PubKey::Rsa { ref n, ref e } => match sig.sig {
+            PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), &padded),
             _ => bail!("key/signature type mismatch"),
         },
         PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
@@ -86,4 +111,12 @@ pub fn verify(key: &PubKey, sig: &PublicKeySig, padded_hash: &[u8]) -> Result<()
         PubKey::Dsa { .. } => bail!("not implemented: verify dsa signatures"),
         PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
     }
+}
+
+fn make_tail(len: usize) -> Result<[u8; 6], Error> {
+    let mut tail = [0u8; 6];
+    tail[0] = 0x04;
+    tail[1] = 0xff;
+    BigEndian::write_u32(&mut tail[2..], u32(len)?);
+    Ok(tail)
 }

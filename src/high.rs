@@ -4,13 +4,11 @@ use std::io::Write;
 
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
-use cast::u32;
 use failure::err_msg;
 use failure::Error;
 
 use crate::keyring::Keyring;
 use crate::packets;
-use crate::PublicKeySig;
 
 /// Verify the data in a document
 ///
@@ -54,42 +52,13 @@ pub fn verify_message<R: BufRead, W: Write>(
         .body
         .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
 
-    let mut digest = body.digest;
-    digest.process(&sig.authenticated_data);
-    digest.process(&make_tail(sig.authenticated_data.len())?);
-
-    let hash = digest.clone().hash();
-
-    {
-        let actual = BigEndian::read_u16(&hash);
-        ensure!(
-            actual == sig.hash_hint,
-            "digest hint doesn't match; digest is probably wrong, exp: {:04x}, act: {:04x}",
-            sig.hash_hint,
-            actual,
-        );
-    }
-
-    let padded = match sig.sig {
-        PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
-        _ => bail!("unsupported signature"),
-    };
-
     for key in keyring.keys_with_id(BigEndian::read_u64(
         &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
     )) {
-        if crate::verify(key, &sig.sig, &padded).is_ok() {
+        if crate::verify(key, &sig, body.digest.clone()).is_ok() {
             return Ok(());
         }
     }
 
     bail!("no known keys could validate the signature")
-}
-
-fn make_tail(len: usize) -> Result<[u8; 6], Error> {
-    let mut tail = [0u8; 6];
-    tail[0] = 0x04;
-    tail[1] = 0xff;
-    BigEndian::write_u32(&mut tail[2..], u32(len)?);
-    Ok(tail)
 }
