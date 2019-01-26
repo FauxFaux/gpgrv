@@ -18,7 +18,6 @@ pub fn any_signature_valid<'s, S: IntoIterator<Item = &'s Signature>>(
     sigs: S,
     digest: &Digestable,
 ) -> Result<(), Error> {
-
     for sig in sigs {
         if single_signature_valid(keyring, sig, digest.clone()).is_ok() {
             return Ok(());

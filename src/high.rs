@@ -2,8 +2,8 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use failure::err_msg;
 use failure::ensure;
+use failure::err_msg;
 use failure::Error;
 
 use crate::keyring::Keyring;
@@ -39,9 +39,16 @@ pub fn verify_message<R: BufRead, W: Write>(
         .body
         .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
 
-    let signatures_of_correct_type: Vec<_> = doc.signatures.into_iter().filter(|sig| body.sig_type == sig.sig_type).collect();
+    let signatures_of_correct_type: Vec<_> = doc
+        .signatures
+        .into_iter()
+        .filter(|sig| body.sig_type == sig.sig_type)
+        .collect();
 
-    ensure!(!signatures_of_correct_type.is_empty(), "no signatures are of the correct type");
+    ensure!(
+        !signatures_of_correct_type.is_empty(),
+        "no signatures are of the correct type"
+    );
 
     crate::any_signature_valid(keyring, &signatures_of_correct_type, &body.digest)
 }

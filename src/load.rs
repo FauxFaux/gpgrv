@@ -44,15 +44,10 @@ pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc
     }
 }
 
-pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Result<Doc, Error> {
-    let mut lines = from.lines();
-    match lines
-        .next()
-        .ok_or_else(|| format_err!("unexpected EOF looking for begin marker"))??
-        .trim()
-    {
+pub fn read_armoured_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
+    match String::from_utf8(from.read_short_line()?)?.trim() {
         armour::BEGIN_SIGNED_MESSAGE => {
-            let msg = armour::parse_armoured_signed_message(lines, put_content)?;
+            let msg = armour::parse_armoured_signed_message(from, put_content)?;
 
             let signatures = read_signatures_only(io::Cursor::new(msg.block))?;
 
@@ -66,7 +61,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
             })
         }
         armour::BEGIN_SIGNATURE => {
-            let block = armour::parse_armoured_signature_body(lines)?;
+            let block = armour::parse_armoured_signature_body(from)?;
 
             let signatures = read_signatures_only(io::Cursor::new(block))?;
 
@@ -160,4 +155,40 @@ pub fn read_signatures_only<R: BufRead>(from: R) -> Result<Vec<packets::Signatur
     })?;
 
     Ok(signatures)
+}
+
+pub trait ShortLine {
+    fn read_short_line(&mut self) -> Result<Vec<u8>, io::Error>;
+}
+
+impl<B: BufRead> ShortLine for B {
+    fn read_short_line(&mut self) -> Result<Vec<u8>, io::Error> {
+        let mut last_seen = 0;
+
+        loop {
+            let buf = self.fill_buf()?;
+
+            // we didn't get any longer, so the file has given up feeding us
+            if buf.len() == last_seen {
+                return Err(io::ErrorKind::UnexpectedEof.into());
+            }
+
+            // can we see the end in the new bit?
+            if let Some(end) = memchr::memchr(b'\n', &buf[last_seen..]) {
+                let excluding_new_line = last_seen + end;
+                let ret = buf[..excluding_new_line].to_vec();
+                self.consume(excluding_new_line + 1);
+                return Ok(ret);
+            }
+
+            last_seen = buf.len();
+        }
+    }
+}
+
+#[test]
+fn short_line() {
+    let mut r = io::Cursor::new(b"foo\nbar\n");
+    assert_eq!(b"foo", r.read_short_line().unwrap().as_slice());
+    assert_eq!(b"bar", r.read_short_line().unwrap().as_slice());
 }
