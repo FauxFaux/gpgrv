@@ -31,11 +31,6 @@ num = "0.2"
 sha-1 = "0.8"
 sha2 = "0.8"
 
-[dependencies.buffered-reader]
-version = "0.3"
-# compressed readers
-default-features = false
-
 [dev-dependencies]
 clap = "2"
 tempfile = "3"

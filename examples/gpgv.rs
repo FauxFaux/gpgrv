@@ -11,6 +11,7 @@ use clap::App;
 use clap::Arg;
 use failure::Error;
 use failure::ResultExt;
+use gpgrv::ManyReader;
 
 fn main() -> Result<(), Error> {
     let matches = App::new("gpgv")
@@ -43,8 +44,10 @@ fn main() -> Result<(), Error> {
 
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_message(
-            buffered_reader::BufferedReaderFile::open(file)
-                .with_context(|_| format_err!("opening input file {:?}", file))?,
+            ManyReader::new(
+                fs::File::open(file)
+                    .with_context(|_| format_err!("opening input file {:?}", file))?,
+            ),
             iowrap::Ignore::new(),
             &keyring,
         )

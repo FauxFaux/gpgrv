@@ -1,7 +1,7 @@
 use std::collections::HashSet;
+use std::io::Read;
 use std::io::Write;
 
-use buffered_reader::BufferedReader;
 use failure::bail;
 use failure::ensure;
 use failure::format_err;
@@ -10,6 +10,7 @@ use failure::ResultExt;
 
 use crate::armour;
 use crate::digestable::Digestable;
+use crate::manyread::ManyReader;
 use crate::packets;
 use crate::packets::Event;
 use crate::packets::Packet;
@@ -30,12 +31,9 @@ pub struct Body {
     pub header: Option<packets::PlainData>,
 }
 
-pub fn read_doc<R, B: BufferedReader<R>, W: Write>(
-    mut from: B,
-    put_content: W,
-) -> Result<Doc, Error> {
+pub fn read_doc<R: Read, W: Write>(mut from: ManyReader<R>, put_content: W) -> Result<Doc, Error> {
     let first_byte = {
-        let head = from.data(1)?;
+        let head = from.fill_at_least(1)?;
         ensure!(!head.is_empty(), "empty file");
         head[0]
     };
@@ -46,16 +44,13 @@ pub fn read_doc<R, B: BufferedReader<R>, W: Write>(
     }
 }
 
-fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
-    from: B,
-    mut put_content: W,
-) -> Result<Doc, Error> {
-    let mut reader = iowrap::Pos::new(from);
+fn read_binary_doc<R: Read, W: Write>(from: R, mut put_content: W) -> Result<Doc, Error> {
+    let mut from = iowrap::Pos::new(from);
     let mut signatures = Vec::with_capacity(16);
     let mut body = None;
     let mut body_modes = HashSet::with_capacity(4);
 
-    packets::parse_packets(&mut reader, &mut |ev| {
+    packets::parse_packets(&mut from, &mut |ev| {
         match ev {
             Event::Packet(Packet::Signature(sig)) => signatures.push(sig),
             Event::Packet(Packet::OnePassHelper(help)) => {
@@ -103,7 +98,7 @@ fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
         }
         Ok(())
     })
-    .with_context(|_| format_err!("parsing after at around {}", reader.position()))?;
+    .with_context(|_| format_err!("parsing after at around {}", from.position()))?;
 
     Ok(Doc { body, signatures })
 }

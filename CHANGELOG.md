@@ -7,4 +7,3 @@
       data streams. `verify_detached` can read
      detached signatures.
  * Other functions have been eaten by `read_doc`.
- 

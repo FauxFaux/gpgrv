@@ -2,6 +2,8 @@ extern crate gpgrv;
 
 use std::io;
 
+use gpgrv::ManyReader;
+
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
 const HELLO_WORLD: &str = include_str!("smoke/hello-world.asc");
 const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("smoke/real-world-dizziest.gpg");
@@ -9,7 +11,7 @@ const REAL_WORLD_DIZZIEST: &[u8] = include_bytes!("smoke/real-world-dizziest.gpg
 #[test]
 fn split() {
     gpgrv::read_doc(
-        buffered_reader::BufferedReaderMemory::new(HELLO_WORLD.as_bytes()),
+        ManyReader::new(io::Cursor::new(HELLO_WORLD.as_bytes())),
         io::Cursor::new(vec![]),
     )
     .unwrap();
@@ -19,10 +21,10 @@ fn split() {
 fn verify() {
     let mut keyring = gpgrv::Keyring::new();
     keyring
-        .append_keys_from(buffered_reader::BufferedReaderMemory::new(FAUX_KEY))
+        .append_keys_from(ManyReader::new(io::Cursor::new(FAUX_KEY)))
         .unwrap();
     gpgrv::verify_message(
-        buffered_reader::BufferedReaderMemory::new(HELLO_WORLD.as_bytes()),
+        ManyReader::new(io::Cursor::new(HELLO_WORLD.as_bytes())),
         io::Cursor::new(vec![]),
         &keyring,
     )
