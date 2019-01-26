@@ -1,6 +1,7 @@
 use digest::FixedOutput;
 use digest::Input;
 use failure::Error;
+use failure::ensure;
 
 #[derive(Debug, Clone)]
 pub enum Digestable {

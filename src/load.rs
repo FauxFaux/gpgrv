@@ -8,6 +8,7 @@ use failure::ensure;
 use failure::err_msg;
 use failure::Error;
 use failure::ResultExt;
+use failure::format_err;
 
 use crate::armour;
 use crate::digestable::Digestable;

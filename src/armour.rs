@@ -5,6 +5,9 @@ use std::io::Write;
 
 use crate::digestable::Digestable;
 use failure::Error;
+use failure::bail;
+use failure::format_err;
+use failure::ensure;
 
 use base64;
 

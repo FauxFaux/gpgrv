@@ -1,15 +1,3 @@
-extern crate base64;
-extern crate byteorder;
-extern crate digest;
-
-#[macro_use]
-extern crate failure;
-extern crate hex;
-extern crate iowrap;
-extern crate num;
-extern crate sha1;
-extern crate sha2;
-
 mod armour;
 mod digestable;
 mod hash_multimap;

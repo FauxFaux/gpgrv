@@ -2,6 +2,9 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use cast::u32;
 use failure::Error;
+use failure::bail;
+use failure::format_err;
+use failure::ensure;
 
 use crate::rsa;
 use crate::Digestable;

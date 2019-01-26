@@ -1,4 +1,5 @@
 use failure::Error;
+use failure::bail;
 
 use crate::mpi;
 

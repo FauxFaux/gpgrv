@@ -4,6 +4,7 @@ use std::io::Write;
 
 use failure::err_msg;
 use failure::Error;
+use failure::bail;
 
 use crate::keyring::Keyring;
 use crate::packets;

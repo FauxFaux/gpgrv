@@ -12,6 +12,8 @@ use digest::Digest;
 use digest::FixedOutput;
 use failure::Error;
 use failure::ResultExt;
+use failure::bail;
+use failure::ensure;
 
 use crate::HashAlg;
 use crate::PubKey;
