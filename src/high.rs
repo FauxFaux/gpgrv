@@ -4,6 +4,7 @@ use std::io::Write;
 
 use failure::ensure;
 use failure::err_msg;
+use failure::format_err;
 use failure::Error;
 
 use crate::keyring::Keyring;
@@ -51,4 +52,5 @@ pub fn verify_message<R: BufRead, W: Write>(
     );
 
     crate::any_signature_valid(keyring, &signatures_of_correct_type, &body.digest)
+        .map_err(|errors| format_err!("no valid signatures: {:?}", errors))
 }

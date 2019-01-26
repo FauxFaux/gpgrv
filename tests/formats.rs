@@ -3,6 +3,7 @@ extern crate gpgrv;
 
 use std::io;
 
+use failure::format_err;
 use failure::Error;
 use gpgrv::Keyring;
 
@@ -41,7 +42,8 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
 
     if let Some(body) = doc.body {
-        gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)?;
+        gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)
+            .map_err(|errors| format_err!("no valid signatures: {:?}", errors))?;
     }
 
     Ok(())

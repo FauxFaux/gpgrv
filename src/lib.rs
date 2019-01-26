@@ -18,6 +18,7 @@ pub use crate::packets::parse_packets;
 pub use crate::packets::Event;
 pub use crate::packets::Packet;
 pub use crate::packets::Signature;
+pub use crate::verify::is_any_signature_valid;
 pub use crate::verify::any_signature_valid;
 pub use crate::verify::single_signature_valid;
 

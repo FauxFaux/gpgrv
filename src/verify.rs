@@ -1,10 +1,6 @@
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use cast::u32;
-use failure::bail;
-use failure::ensure;
-use failure::format_err;
-use failure::Error;
 
 use crate::rsa;
 use crate::Digestable;
@@ -13,77 +9,124 @@ use crate::PubKey;
 use crate::PublicKeySig;
 use crate::Signature;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SignatureError {
+    /// The signature is not correct.
+    Mismatch,
+
+    /// The signature hint is not correct. This means that the data was corrupted,
+    /// or that it was canonicalised incorrectly.
+    HintMismatch,
+
+    /// We don't have the key the signature asks for.
+    NoKey,
+
+    /// The signature or key contains recognised, but invalid, data.
+    BadData,
+
+    /// The signature or key uses an algorithm that is not currently supported.
+    UnsupportedAlgorithm,
+
+    /// The key and signature are of incompatible types.
+    KeySignatureIncompatible,
+
+    /// The signature lacked the (optional) `issuer` field. This is not supported.
+    NoIssuer,
+}
+
+pub fn is_any_signature_valid<'s, S: IntoIterator<Item = &'s Signature>>(
+    keyring: &Keyring,
+    sigs: S,
+    digest: &Digestable,
+) -> bool {
+    any_signature_valid(keyring, sigs, digest).is_ok()
+}
+
 pub fn any_signature_valid<'s, S: IntoIterator<Item = &'s Signature>>(
     keyring: &Keyring,
     sigs: S,
     digest: &Digestable,
-) -> Result<(), Error> {
+) -> Result<(), Vec<SignatureError>> {
+    let mut errors = Vec::with_capacity(4);
     for sig in sigs {
-        if single_signature_valid(keyring, sig, digest.clone()).is_ok() {
-            return Ok(());
+        match single_signature_valid(keyring, sig, digest.clone()) {
+            Ok(()) => return Ok(()),
+            Err(e) => errors.extend(e),
         }
     }
 
-    bail!("none of the signatures were valid")
+    Err(errors)
 }
 
 pub fn single_signature_valid(
     keyring: &Keyring,
     sig: &Signature,
     mut digest: Digestable,
-) -> Result<(), Error> {
+) -> Result<(), Vec<SignatureError>> {
     digest.process(&sig.authenticated_data);
-    digest.process(&make_tail(sig.authenticated_data.len())?);
+
+    let len = match u32(sig.authenticated_data.len()) {
+        Ok(len) => len,
+        Err(_) => return Err(vec![SignatureError::BadData]),
+    };
+
+    digest.process(&make_tail(len));
 
     let hash = digest.clone().hash();
 
-    {
-        let actual = BigEndian::read_u16(&hash);
-        ensure!(
-            actual == sig.hash_hint,
-            "digest hint doesn't match; digest is probably wrong, exp: {:04x}, act: {:04x}",
-            sig.hash_hint,
-            actual,
-        );
+    if sig.hash_hint != BigEndian::read_u16(&hash) {
+        return Err(vec![SignatureError::HintMismatch]);
     }
 
     let padded_hash = match sig.sig {
-        PublicKeySig::Rsa(ref sig) => digest.emsa_pkcs1_v1_5(&hash, sig.len())?,
-        _ => bail!("unsupported signature"),
+        PublicKeySig::Rsa(ref sig) => digest
+            .emsa_pkcs1_v1_5(&hash, sig.len())
+            .ok_or_else(|| vec![SignatureError::BadData])?,
+        _ => return Err(vec![SignatureError::UnsupportedAlgorithm]),
     };
 
-    for key in keyring.keys_with_id(BigEndian::read_u64(
-        &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
-    )) {
-        if single_signature_key_valid(key, &sig.sig, &padded_hash).is_ok() {
-            return Ok(());
+    let keys = keyring.keys_with_id(BigEndian::read_u64(
+        &sig.issuer.ok_or_else(|| vec![SignatureError::NoIssuer])?,
+    ));
+
+    if keys.is_empty() {
+        return Err(vec![SignatureError::NoKey]);
+    }
+
+    let mut errors = Vec::with_capacity(keys.len());
+
+    for key in keys {
+        match single_signature_key_valid(key, &sig.sig, &padded_hash) {
+            Ok(()) => return Ok(()),
+            Err(e) => errors.push(e),
         }
     }
 
-    bail!("no known keys could validate the signature")
+    Err(errors)
 }
 
 fn single_signature_key_valid(
     key: &PubKey,
     sig: &PublicKeySig,
     padded_hash: &[u8],
-) -> Result<(), Error> {
+) -> Result<(), SignatureError> {
     match *key {
         PubKey::Rsa { ref n, ref e } => match *sig {
             PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
-            _ => bail!("key/signature type mismatch"),
+            _ => Err(SignatureError::KeySignatureIncompatible),
         },
-        PubKey::Ecdsa { .. } => bail!("not implemented: verify ecdsa signatures"),
-        PubKey::Ed25519 { .. } => bail!("not implemented: verify ed25519 signatures"),
-        PubKey::Dsa { .. } => bail!("not implemented: verify dsa signatures"),
-        PubKey::Elgaml { .. } => bail!("elgaml may not have signatures"),
+        PubKey::Ecdsa { .. } => Err(SignatureError::UnsupportedAlgorithm),
+        PubKey::Ed25519 { .. } => Err(SignatureError::UnsupportedAlgorithm),
+        PubKey::Dsa { .. } => Err(SignatureError::UnsupportedAlgorithm),
+        // Elgaml doesn't support signing
+        PubKey::Elgaml { .. } => Err(SignatureError::BadData),
     }
 }
 
-fn make_tail(len: usize) -> Result<[u8; 6], Error> {
+fn make_tail(len: u32) -> [u8; 6] {
     let mut tail = [0u8; 6];
     tail[0] = 0x04;
     tail[1] = 0xff;
-    BigEndian::write_u32(&mut tail[2..], u32(len)?);
-    Ok(tail)
+    BigEndian::write_u32(&mut tail[2..], len);
+    tail
 }

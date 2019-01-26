@@ -1,11 +1,14 @@
-use failure::bail;
-use failure::Error;
-
 use crate::mpi;
+use crate::verify::SignatureError;
 
-pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<(), Error> {
+pub fn verify(
+    sig: &[u8],
+    (n, e): (&[u8], &[u8]),
+    padded_hash: &[u8],
+) -> Result<(), SignatureError> {
     if sig.len() < (2048 / 8) {
-        bail!("signature too short");
+        // signature too short
+        return Err(SignatureError::BadData);
     }
 
     let expected = mpi::pow_mod(sig, e, n);
@@ -14,5 +17,5 @@ pub fn verify(sig: &[u8], (n, e): (&[u8], &[u8]), padded_hash: &[u8]) -> Result<
         return Ok(());
     }
 
-    bail!("signatures don't match")
+    Err(SignatureError::Mismatch)
 }

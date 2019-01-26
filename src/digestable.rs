@@ -1,7 +1,5 @@
 use digest::FixedOutput;
 use digest::Input;
-use failure::ensure;
-use failure::Error;
 
 #[derive(Debug, Clone)]
 pub enum Digestable {
@@ -41,18 +39,17 @@ impl Digestable {
     }
 
     // https://tools.ietf.org/html/rfc3447#section-9.2
-    pub fn emsa_pkcs1_v1_5(&self, hash: &[u8], output_len: usize) -> Result<Vec<u8>, Error> {
+    pub fn emsa_pkcs1_v1_5(&self, hash: &[u8], output_len: usize) -> Option<Vec<u8>> {
         // step 1: compute digest
 
         // step 2
         let mut digest_info = self.asn1_prefix().to_vec();
         digest_info.extend(hash);
 
-        // step 3
-        ensure!(
-            output_len > digest_info.len() + 11,
-            "intended encoded message length too short"
-        );
+        // step 3: intended encoded message length too short
+        if output_len <= digest_info.len() + 11 {
+            return None;
+        }
 
         // step 4, 5
         let mut ret = Vec::with_capacity(output_len);
@@ -67,7 +64,7 @@ impl Digestable {
         ret.extend(digest_info);
 
         assert_eq!(ret.len(), output_len);
-        Ok(ret)
+        Some(ret)
     }
 
     pub fn asn1_prefix(&self) -> &'static [u8] {
