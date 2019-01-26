@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::io;
 
 use base64;
 use buffered_reader::BufferedReader;
@@ -11,20 +12,58 @@ use failure::Error;
 use failure::ResultExt;
 
 use crate::digestable::Digestable;
-use crate::load::read_short_line;
 use crate::packets::SignatureType;
+use crate::packets;
+use crate::packets::Event;
+use crate::packets::Packet;
+use crate::load;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
 const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
-pub struct Message {
+struct Message {
     pub digest: Digestable,
     pub sig_type: SignatureType,
     pub block: Vec<u8>,
 }
 
-pub fn parse_armoured_signed_message<R, B: BufferedReader<R>, W: Write>(
+pub fn read_armoured_doc<R, B: BufferedReader<R>, W: Write>(
+    mut from: B,
+    put_content: W,
+) -> Result<load::Doc, Error> {
+    match String::from_utf8(read_short_line(&mut from)?)?.trim() {
+        BEGIN_SIGNED_MESSAGE => {
+            let msg = parse_armoured_signed_message(from, put_content)?;
+
+            let signatures =
+                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&msg.block))?;
+
+            Ok(load::Doc {
+                body: Some(load::Body {
+                    digest: msg.digest,
+                    sig_type: SignatureType::CanonicalisedText,
+                    header: None,
+                }),
+                signatures,
+            })
+        }
+        BEGIN_SIGNATURE => {
+            let block = parse_armoured_signature_body(from)?;
+
+            let signatures =
+                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&block))?;
+
+            Ok(load::Doc {
+                body: None,
+                signatures,
+            })
+        }
+        other => bail!("invalid header line: {:?}", other),
+    }
+}
+
+fn parse_armoured_signed_message<R, B: BufferedReader<R>, W: Write>(
     mut from: B,
     to: W,
 ) -> Result<Message, Error> {
@@ -137,7 +176,7 @@ fn canonicalise<R, B: BufferedReader<R>, W: Write>(
     }
 }
 
-pub fn parse_armoured_signature_body<R, B: BufferedReader<R>>(
+fn parse_armoured_signature_body<R, B: BufferedReader<R>>(
     mut from: B,
 ) -> Result<Vec<u8>, Error> {
     let _sig_headers = take_headers(&mut from)?;
@@ -170,6 +209,38 @@ pub fn parse_armoured_signature_body<R, B: BufferedReader<R>>(
 
     Ok(base64::decode(&signature)
         .with_context(|_| format_err!("base64 decoding signature: {:?}", signature))?)
+}
+
+fn read_signatures_only<R, B: BufferedReader<R>>(
+    from: B,
+) -> Result<Vec<packets::Signature>, Error> {
+    let mut signatures = Vec::new();
+
+    packets::parse_packets(from, &mut |ev| match ev {
+        Event::Packet(Packet::Signature(sig)) => {
+            signatures.push(sig);
+            Ok(())
+        }
+        Event::Packet(Packet::IgnoredJunk) => Ok(()),
+        Event::Packet(other) => Err(format_err!(
+            "unexpected packet in signature block: {:?}",
+            other
+        )),
+        Event::PlainData(_, _) => Err(err_msg("unexpected plain data in signature doc")),
+    })?;
+
+    Ok(signatures)
+}
+
+fn read_short_line<R, B: BufferedReader<R>>(from: &mut B) -> Result<Vec<u8>, io::Error> {
+    let buf = from.data(4096)?;
+    if let Some(end) = memchr::memchr(b'\n', &buf) {
+        let ret = buf[..end].to_vec();
+        from.consume(end + 1);
+        return Ok(ret);
+    }
+
+    Err(io::ErrorKind::UnexpectedEof.into())
 }
 
 fn take_headers<R, B: BufferedReader<R>>(from: &mut B) -> Result<HashMap<String, String>, Error> {
@@ -285,5 +356,13 @@ mod tests {
         // % printf 'foo\r\nbar' | sha1sum
         //           ad489cb3657d52202c7f1709513d2cf1e0f9162a
         assert_eq!(0xad489cb3657d5220, sha1(b"foo\r\nbar"));
+    }
+
+    #[test]
+    fn short_line() {
+        use super::read_short_line;
+        let mut r = buffered_reader::BufferedReaderMemory::new(b"foo\nbar\n");
+        assert_eq!(b"foo", read_short_line(&mut r).unwrap().as_slice());
+        assert_eq!(b"bar", read_short_line(&mut r).unwrap().as_slice());
     }
 }

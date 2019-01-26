@@ -58,7 +58,7 @@ pub fn any_signature_valid<'s, S: IntoIterator<Item = &'s Signature>>(
     Err(errors)
 }
 
-pub fn single_signature_valid(
+fn single_signature_valid(
     keyring: &Keyring,
     sig: &Signature,
     mut digest: Digestable,

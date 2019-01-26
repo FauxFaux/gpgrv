@@ -1,11 +1,9 @@
 use std::collections::HashSet;
-use std::io;
 use std::io::Write;
 
 use buffered_reader::BufferedReader;
 use failure::bail;
 use failure::ensure;
-use failure::err_msg;
 use failure::format_err;
 use failure::Error;
 use failure::ResultExt;
@@ -43,47 +41,13 @@ pub fn read_doc<R, B: BufferedReader<R>, W: Write>(
     };
 
     match first_byte {
-        b'-' => read_armoured_doc(from, put_content),
+        b'-' => armour::read_armoured_doc(from, put_content),
         _ => read_binary_doc(from, put_content),
     }
 }
 
-pub fn read_armoured_doc<R, B: BufferedReader<R>, W: Write>(
-    mut from: B,
-    put_content: W,
-) -> Result<Doc, Error> {
-    match String::from_utf8(read_short_line(&mut from)?)?.trim() {
-        armour::BEGIN_SIGNED_MESSAGE => {
-            let msg = armour::parse_armoured_signed_message(from, put_content)?;
 
-            let signatures =
-                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&msg.block))?;
-
-            Ok(Doc {
-                body: Some(Body {
-                    digest: msg.digest,
-                    sig_type: SignatureType::CanonicalisedText,
-                    header: None,
-                }),
-                signatures,
-            })
-        }
-        armour::BEGIN_SIGNATURE => {
-            let block = armour::parse_armoured_signature_body(from)?;
-
-            let signatures =
-                read_signatures_only(buffered_reader::BufferedReaderMemory::new(&block))?;
-
-            Ok(Doc {
-                body: None,
-                signatures,
-            })
-        }
-        other => bail!("invalid header line: {:?}", other),
-    }
-}
-
-pub fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
+fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
     from: B,
     mut put_content: W,
 ) -> Result<Doc, Error> {
@@ -152,43 +116,4 @@ pub fn digestable_for(hash_type: HashAlg) -> Option<Digestable> {
         HashAlg::Sha512 => Digestable::sha512(),
         _ => return None,
     })
-}
-
-pub fn read_signatures_only<R, B: BufferedReader<R>>(
-    from: B,
-) -> Result<Vec<packets::Signature>, Error> {
-    let mut signatures = Vec::new();
-
-    packets::parse_packets(from, &mut |ev| match ev {
-        Event::Packet(Packet::Signature(sig)) => {
-            signatures.push(sig);
-            Ok(())
-        }
-        Event::Packet(Packet::IgnoredJunk) => Ok(()),
-        Event::Packet(other) => Err(format_err!(
-            "unexpected packet in signature block: {:?}",
-            other
-        )),
-        Event::PlainData(_, _) => Err(err_msg("unexpected plain data in signature doc")),
-    })?;
-
-    Ok(signatures)
-}
-
-pub fn read_short_line<R, B: BufferedReader<R>>(from: &mut B) -> Result<Vec<u8>, io::Error> {
-    let buf = from.data(4096)?;
-    if let Some(end) = memchr::memchr(b'\n', &buf) {
-        let ret = buf[..end].to_vec();
-        from.consume(end + 1);
-        return Ok(ret);
-    }
-
-    Err(io::ErrorKind::UnexpectedEof.into())
-}
-
-#[test]
-fn short_line() {
-    let mut r = buffered_reader::BufferedReaderMemory::new(b"foo\nbar\n");
-    assert_eq!(b"foo", read_short_line(&mut r).unwrap().as_slice());
-    assert_eq!(b"bar", read_short_line(&mut r).unwrap().as_slice());
 }

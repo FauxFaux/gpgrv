@@ -14,14 +14,17 @@ pub use crate::high::verify_detached;
 pub use crate::high::verify_message;
 pub use crate::keyring::Keyring;
 pub use crate::load::read_doc;
-pub use crate::packets::parse_packet;
+pub use crate::verify::any_signature_valid;
+pub use crate::verify::is_any_signature_valid;
+
+
+// Testing.
 pub use crate::packets::parse_packets;
 pub use crate::packets::Event;
 pub use crate::packets::Packet;
 pub use crate::packets::Signature;
-pub use crate::verify::any_signature_valid;
-pub use crate::verify::is_any_signature_valid;
-pub use crate::verify::single_signature_valid;
+//pub use crate::packets::parse_packet;
+//pub use crate::verify::single_signature_valid;
 
 #[derive(Clone, Debug)]
 pub enum PublicKeySig {
