@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io;
 use std::io::BufRead;
@@ -63,7 +62,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
             })
         }
         armour::BEGIN_SIGNATURE => {
-            let (sig_headers, block) = armour::parse_armoured_signature_body(lines)?;
+            let block = armour::parse_armoured_signature_body(lines)?;
 
             let signatures = read_signatures_only(io::Cursor::new(block))?;
 

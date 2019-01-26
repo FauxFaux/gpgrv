@@ -14,8 +14,6 @@ const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 pub struct Message {
     pub digest: Digestable,
-    pub body_headers: HashMap<String, String>,
-    pub sig_headers: HashMap<String, String>,
     pub block: Vec<u8>,
 }
 
@@ -67,20 +65,13 @@ pub fn parse_armoured_signed_message<R: BufRead, W: Write>(
         digest.process(line.as_bytes());
     }
 
-    let (sig_headers, signature) = parse_armoured_signature_body(lines)?;
+    let block = parse_armoured_signature_body(lines)?;
 
-    Ok(Message {
-        digest,
-        body_headers,
-        sig_headers,
-        block: signature,
-    })
+    Ok(Message { digest, block })
 }
 
-pub fn parse_armoured_signature_body<R: BufRead>(
-    mut lines: Lines<R>,
-) -> Result<(HashMap<String, String>, Vec<u8>), Error> {
-    let sig_headers = take_headers(&mut lines)?;
+pub fn parse_armoured_signature_body<R: BufRead>(mut lines: Lines<R>) -> Result<Vec<u8>, Error> {
+    let _sig_headers = take_headers(&mut lines)?;
 
     let mut signature = String::with_capacity(1024);
 
@@ -112,7 +103,7 @@ pub fn parse_armoured_signature_body<R: BufRead>(
         signature.push_str(line);
     }
 
-    Ok((sig_headers, base64::decode(&signature)?))
+    Ok(base64::decode(&signature)?)
 }
 
 fn take_headers<R: BufRead>(lines: &mut Lines<R>) -> Result<HashMap<String, String>, Error> {

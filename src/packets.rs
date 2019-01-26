@@ -6,6 +6,7 @@ use std::u32;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
+use cast::u64;
 use cast::usize;
 use digest::Digest;
 use digest::FixedOutput;
@@ -207,11 +208,18 @@ where
         // 16: not defined
         // 17: extended user id (non-textual name information, e.g. image)
         12 | 13 | 17 => {
-            let len = match len {
+            let wanted = u64(match len {
                 Some(len) => len,
                 None => bail!("indeterminate length {} not supported", tag),
-            };
-            from.read_exact(&mut vec![0u8; usize(len)])?;
+            });
+            let found = io::copy(&mut from, &mut iowrap::Ignore::new())?;
+            ensure!(
+                found == wanted,
+                "short read discarding packet: {}, found: {}, wanted: {}",
+                tag,
+                found,
+                wanted
+            );
             into(Event::Packet(Packet::IgnoredJunk))?;
         }
         18 => bail!("not supported: symmetrically encrypted and maced data"),
