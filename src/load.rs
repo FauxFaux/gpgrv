@@ -19,11 +19,14 @@ use crate::packets::Signature;
 
 #[derive(Clone, Debug)]
 pub struct Doc {
-    pub data_digest: Option<Digestable>,
-    pub data_header: Option<packets::PlainData>,
-    pub body_headers: HashMap<String, String>,
-    pub sig_headers: HashMap<String, String>,
+    pub body: Option<Body>,
     pub signatures: Vec<Signature>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Body {
+    pub digest: Digestable,
+    pub header: Option<packets::PlainData>,
 }
 
 pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
@@ -52,10 +55,10 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
             let signatures = read_signatures_only(io::Cursor::new(msg.block))?;
 
             Ok(Doc {
-                data_digest: Some(msg.digest),
-                data_header: None,
-                body_headers: msg.body_headers,
-                sig_headers: msg.sig_headers,
+                body: Some(Body {
+                    digest: msg.digest,
+                    header: None,
+                }),
                 signatures,
             })
         }
@@ -65,10 +68,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
             let signatures = read_signatures_only(io::Cursor::new(block))?;
 
             Ok(Doc {
-                data_digest: None,
-                data_header: None,
-                body_headers: HashMap::new(),
-                sig_headers,
+                body: None,
                 signatures,
             })
         }
@@ -79,7 +79,7 @@ pub fn read_armoured_doc<R: BufRead, W: Write>(from: R, put_content: W) -> Resul
 pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Result<Doc, Error> {
     let mut reader = iowrap::Pos::new(from);
     let mut signatures = Vec::with_capacity(16);
-    let mut data_header = None;
+    let mut body = None;
     let mut hash_types = HashSet::new();
     packets::parse_packets(&mut reader, &mut |ev| {
         match ev {
@@ -89,7 +89,7 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
             }
             Event::Packet(Packet::IgnoredJunk) | Event::Packet(Packet::PubKey(_)) => (),
             Event::PlainData(header, from) => {
-                if data_header.is_some() {
+                if body.is_some() {
                     bail!("not supported: multiple plain data segments");
                 }
 
@@ -107,20 +107,17 @@ pub fn read_binary_doc<R: BufRead, W: Write>(from: R, mut put_content: W) -> Res
                 };
 
                 io::copy(from, &mut put_content)?;
-                data_header = Some(header);
+                body = Some(Body {
+                    digest: digestable,
+                    header: Some(header),
+                });
             }
         }
         Ok(())
     })
     .with_context(|_| format_err!("parsing after at around {}", reader.position()))?;
 
-    Ok(Doc {
-        data_digest: None,
-        data_header,
-        body_headers: HashMap::new(),
-        sig_headers: HashMap::new(),
-        signatures,
-    })
+    Ok(Doc { body, signatures })
 }
 
 pub fn read_signatures_only<R: BufRead>(from: R) -> Result<Vec<packets::Signature>, Error> {

@@ -5,6 +5,7 @@ use std::io::Write;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use cast::u32;
+use failure::err_msg;
 use failure::Error;
 
 use crate::keyring::Keyring;
@@ -36,11 +37,12 @@ pub fn verify_message<R: BufRead, W: Write>(
     to: W,
     keyring: &Keyring,
 ) -> Result<(), Error> {
-    let mut armour_removed = crate::load::read_doc(from, io::BufWriter::new(to))?;
-    let sig = match armour_removed.signatures.into_iter().next() {
+    let doc = crate::load::read_doc(from, io::BufWriter::new(to))?;
+
+    // TODO: test all signatures
+    let sig = match doc.signatures.into_iter().next() {
         Some(s) => s,
         None => bail!("no signature in signature stream"),
-        other => bail!("unexpected packet in signature: {:?}", other),
     };
 
     match sig.sig_type {
@@ -48,11 +50,11 @@ pub fn verify_message<R: BufRead, W: Write>(
         other => bail!("invalid signature type in armour: {:?}", other),
     };
 
-    let digest = match armour_removed.data_digest.as_mut() {
-        Some(d) => d,
-        None => bail!("document wasn't a message (i.e. there was no body)"),
-    };
+    let body = doc
+        .body
+        .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
 
+    let mut digest = body.digest;
     digest.process(&sig.authenticated_data);
     digest.process(&make_tail(sig.authenticated_data.len())?);
 

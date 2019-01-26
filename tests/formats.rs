@@ -30,8 +30,10 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     drop_trailing_newline(&mut out);
 
     if detached {
+        assert!(doc.body.is_none());
         assert_eq!(0, out.len());
     } else {
+        assert!(doc.body.is_some());
         assert_eq!(&expected[..expected.len() - 1], out.as_slice());
     }
 
