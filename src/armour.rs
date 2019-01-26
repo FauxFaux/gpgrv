@@ -75,6 +75,7 @@ fn canonicalise<R, B: BufferedReader<R>, W: Write>(
     }
 
     loop {
+        // Note: this will fail to trim whitespace if the whitespace doesn't fit in this buffer
         let buf = from.data(8 * 1024)?;
         if buf.is_empty() {
             bail!("unexpected EOF in message body");
@@ -83,8 +84,10 @@ fn canonicalise<R, B: BufferedReader<R>, W: Write>(
         match memchr::memchr(b'\n', buf) {
             Some(0) => (),
             Some(newline) => {
-                to.write_all(&buf[..newline])?;
-                digest.process(&buf[..newline]);
+                let buf = trim_right(&buf[..newline]);
+
+                to.write_all(buf)?;
+                digest.process(buf);
                 from.consume(newline);
                 continue;
             }
@@ -190,6 +193,22 @@ fn take_headers<R, B: BufferedReader<R>>(from: &mut B) -> Result<HashMap<String,
     Ok(headers)
 }
 
+fn trim_right(buf: &[u8]) -> &[u8] {
+    for i in (0..buf.len()).rev() {
+        if !is_whitespace(buf[i]) {
+            return &buf[..=i];
+        }
+    }
+
+    &[]
+}
+
+// gpg considers \0 whitespace during read-back, but not during writing
+// I'm guessing this is a bug.
+fn is_whitespace(b: u8) -> bool {
+    b' ' == b || b'\r' == b || b'\t' == b || b'\0' == b
+}
+
 #[cfg(test)]
 mod tests {
     use byteorder::ByteOrder;
@@ -220,6 +239,24 @@ mod tests {
             b"- --foo\nbar\n- --baz\n--",
             b"--foo\nbar\n--baz\n",
             b"--foo\r\nbar\r\n--baz",
+        )
+    }
+
+    #[test]
+    fn canon_nul_inside() {
+        assert_canon(
+            b"foo\0bar\n--",
+            b"foo\0bar\n",
+            b"foo\0bar",
+        )
+    }
+
+    #[test]
+    fn canon_nul_trailing() {
+        assert_canon(
+            b"foo\0\n--",
+            b"foo\n",
+            b"foo",
         )
     }
 

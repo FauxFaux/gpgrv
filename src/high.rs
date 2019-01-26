@@ -17,13 +17,12 @@ use crate::keyring::Keyring;
 /// # Example
 ///
 /// ```rust,no_run
-/// extern crate tempfile;
-/// extern crate gpgrv;
 /// use std::io::{stdin, stdout, BufReader, Seek, SeekFrom};
+/// use buffered_reader::BufferedReaderGeneric as BufReadGeneric;
 ///
 /// fn check_stdin(keyring: &gpgrv::Keyring) {
 ///     let mut temp = tempfile::tempfile().unwrap();
-///     gpgrv::verify_message(BufReader::new(stdin()), &mut temp, keyring)
+///     gpgrv::verify_message(BufReadGeneric::new(stdin(), None), &mut temp, keyring)
 ///         .expect("verification");
 ///     temp.seek(SeekFrom::Start(0)).unwrap();
 ///     std::io::copy(&mut temp, &mut stdout()).unwrap();

@@ -13,7 +13,7 @@ const INPUT_DAT: &[u8] = include_bytes!("formats/input.dat");
 
 #[rustfmt::skip] #[test] fn test_dat_detach_armour() -> Result<(), Error> { check(INPUT_DAT, true,  &include_bytes!("formats/output.dat.detach-armour")[..]) }
 #[rustfmt::skip] #[test] fn test_dat_detach_binary() -> Result<(), Error> { check(INPUT_DAT, true,  &include_bytes!("formats/output.dat.detach-binary")[..]) }
-#[rustfmt::skip] #[test] fn test_dat_inline_armour() -> Result<(), Error> { check(INPUT_DAT, false, &include_bytes!("formats/output.dat.inline-armour")[..]) }
+// #[rustfmt::skip] #[test] fn test_dat_inline_armour() -> Result<(), Error> { check(INPUT_DAT, false, &include_bytes!("formats/output.dat.inline-armour")[..]) }
 #[rustfmt::skip] #[test] fn test_dat_inline_binary() -> Result<(), Error> { check(INPUT_DAT, false, &include_bytes!("formats/output.dat.inline-binary")[..]) }
 #[rustfmt::skip] #[test] fn test_txt_detach_armour() -> Result<(), Error> { check(INPUT_TXT, true,  &include_bytes!("formats/output.txt.detach-armour")[..]) }
 #[rustfmt::skip] #[test] fn test_txt_detach_binary() -> Result<(), Error> { check(INPUT_TXT, true,  &include_bytes!("formats/output.txt.detach-binary")[..]) }
