@@ -10,6 +10,7 @@ mod rsa;
 mod verify;
 
 pub use crate::digestable::Digestable;
+pub use crate::high::verify_detached;
 pub use crate::high::verify_message;
 pub use crate::keyring::Keyring;
 pub use crate::load::read_doc;

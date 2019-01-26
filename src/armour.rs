@@ -244,20 +244,12 @@ mod tests {
 
     #[test]
     fn canon_nul_inside() {
-        assert_canon(
-            b"foo\0bar\n--",
-            b"foo\0bar\n",
-            b"foo\0bar",
-        )
+        assert_canon(b"foo\0bar\n--", b"foo\0bar\n", b"foo\0bar")
     }
 
     #[test]
     fn canon_nul_trailing() {
-        assert_canon(
-            b"foo\0\n--",
-            b"foo\n",
-            b"foo",
-        )
+        assert_canon(b"foo\0\n--", b"foo\n", b"foo")
     }
 
     fn assert_canon(input: &[u8], wanted_output: &[u8], wanted_digested: &[u8]) {

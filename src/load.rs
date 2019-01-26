@@ -17,6 +17,7 @@ use crate::packets::Event;
 use crate::packets::Packet;
 use crate::packets::Signature;
 use crate::packets::SignatureType;
+use crate::HashAlg;
 
 #[derive(Clone, Debug)]
 pub struct Doc {
@@ -109,13 +110,8 @@ pub fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
                     _ => bail!("unsupported: multiple body mode hints: {:?}", body_modes),
                 };
 
-                use super::HashAlg;
-                let mut digest = match hash_type {
-                    HashAlg::Sha1 => Digestable::sha1(),
-                    HashAlg::Sha256 => Digestable::sha256(),
-                    HashAlg::Sha512 => Digestable::sha512(),
-                    other => bail!("unsupported binary hash function: {:?}", other),
-                };
+                let mut digest = digestable_for(hash_type)
+                    .ok_or_else(|| format_err!("unsupported hash type: {:?}", hash_type))?;
 
                 use packets::SignatureType;
                 match sig_type {
@@ -147,6 +143,15 @@ pub fn read_binary_doc<R, B: BufferedReader<R>, W: Write>(
     .with_context(|_| format_err!("parsing after at around {}", reader.position()))?;
 
     Ok(Doc { body, signatures })
+}
+
+pub fn digestable_for(hash_type: HashAlg) -> Option<Digestable> {
+    Some(match hash_type {
+        HashAlg::Sha1 => Digestable::sha1(),
+        HashAlg::Sha256 => Digestable::sha256(),
+        HashAlg::Sha512 => Digestable::sha512(),
+        _ => return None,
+    })
 }
 
 pub fn read_signatures_only<R, B: BufferedReader<R>>(

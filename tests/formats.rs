@@ -41,7 +41,14 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     let mut keyring = Keyring::new();
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
 
-    if let Some(body) = doc.body {
+    if detached {
+        gpgrv::verify_detached(
+            buffered_reader::BufferedReaderMemory::new(file),
+            expected,
+            &keyring,
+        )?;
+    } else {
+        let body = doc.body.unwrap();
         gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)
             .map_err(|errors| format_err!("no valid signatures: {:?}", errors))?;
     }
