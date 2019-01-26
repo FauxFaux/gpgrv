@@ -2,8 +2,6 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use byteorder::BigEndian;
-use byteorder::ByteOrder;
 use failure::err_msg;
 use failure::Error;
 
@@ -52,13 +50,5 @@ pub fn verify_message<R: BufRead, W: Write>(
         .body
         .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
 
-    for key in keyring.keys_with_id(BigEndian::read_u64(
-        &sig.issuer.ok_or_else(|| format_err!("missing issuer"))?,
-    )) {
-        if crate::verify(key, &sig, body.digest.clone()).is_ok() {
-            return Ok(());
-        }
-    }
-
-    bail!("no known keys could validate the signature")
+    crate::verify(keyring, &sig, body.digest)
 }
