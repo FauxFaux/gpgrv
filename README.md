@@ -55,10 +55,9 @@ fn check_stdin(keyring: &gpgrv::Keyring) {
 I was using the the `gpgme` API, which works, but the API is painful,
 and the linking/requirements are complicated.
 
-`sequoia`'s license is wrong. In fact, we're using one of their components. Sigh.
+`sequoia`'s license is wrong.
 
-`rpgp` has too many features, although it does seem to be nicely split into crates,
-... I should reuse some.
+`rpgp` has too many features, although it does seem to be nicely split into crates.
  
 
 ## License
