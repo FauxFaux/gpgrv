@@ -17,12 +17,30 @@ impl<K: Eq + Hash, V: Eq + Hash> HashMultiMap<K, V> {
         self.inner.entry(k).or_insert_with(HashSet::new).insert(v)
     }
 
+    pub fn values(&self) -> HashSet<&V> {
+        let mut ret = HashSet::with_capacity(self.inner.len());
+        for value_set in self.inner.values() {
+            for value in value_set {
+                ret.insert(value);
+            }
+        }
+        ret
+    }
+
     pub fn entries<'h>(&'h self) -> Box<Iterator<Item = (&'h K, &'h V)> + 'h> {
         Box::new(
             self.inner
                 .iter()
                 .flat_map(|(k, v)| v.iter().map(move |v| (k, v))),
         )
+    }
+}
+
+impl<K: Clone, V: Clone> Clone for HashMultiMap<K, V> {
+    fn clone(&self) -> Self {
+        HashMultiMap {
+            inner: self.inner.clone(),
+        }
     }
 }
 

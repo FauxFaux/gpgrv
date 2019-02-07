@@ -42,6 +42,10 @@ fn main() -> Result<(), Error> {
             .with_context(|_| format!("reading keyring {:?}", path))?;
     }
 
+    for &key in keyring.key_ids() {
+        println!("loaded key: {:016x}", key);
+    }
+
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_message(
             ManyReader::new(

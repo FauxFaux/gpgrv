@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::fmt;
 use std::io;
 use std::io::Read;
 
@@ -11,6 +13,7 @@ use crate::hash_multimap::HashMultiMap;
 use crate::packets;
 use crate::PubKey;
 
+#[derive(Clone)]
 pub struct Keyring {
     /// Allows a (mathematical) key to have multiple ids.
     /// This is the exact opposite to what all the users want, but is
@@ -67,10 +70,24 @@ impl Keyring {
 
         ret
     }
+
+    pub fn key_ids(&self) -> HashSet<&u64> {
+        self.keys.values()
+    }
 }
 
 impl Default for Keyring {
     fn default() -> Self {
         Keyring::new()
+    }
+}
+
+impl fmt::Debug for Keyring {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Keyring[")?;
+        for &id in self.key_ids() {
+            write!(f, "0x{:016},", id)?;
+        }
+        write!(f, "]")
     }
 }
