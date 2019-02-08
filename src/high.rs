@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::io;
+use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
@@ -10,7 +11,6 @@ use failure::format_err;
 use failure::Error;
 
 use crate::keyring::Keyring;
-use crate::manyread::ManyReader;
 use crate::packets::SignatureType;
 
 /// Verify the data in a document
@@ -25,14 +25,14 @@ use crate::packets::SignatureType;
 ///
 /// fn check_stdin(keyring: &gpgrv::Keyring) {
 ///     let mut temp = tempfile::tempfile().unwrap();
-///     gpgrv::verify_message(gpgrv::ManyReader::new(stdin()), &mut temp, keyring)
+///     gpgrv::verify_message(BufReader::new(stdin()), &mut temp, keyring)
 ///         .expect("verification");
 ///     temp.seek(SeekFrom::Start(0)).unwrap();
 ///     std::io::copy(&mut temp, &mut stdout()).unwrap();
 /// }
 /// ```
-pub fn verify_message<R: Read, W: Write>(
-    from: ManyReader<R>,
+pub fn verify_message<R: BufRead, W: Write>(
+    from: R,
     to: W,
     keyring: &Keyring,
 ) -> Result<(), Error> {
@@ -57,12 +57,12 @@ pub fn verify_message<R: Read, W: Write>(
         .map_err(|errors| format_err!("no valid signatures: {:?}", errors))
 }
 
-pub fn verify_detached<S: Read, M: Read>(
+pub fn verify_detached<S: BufRead, M: Read>(
     signature: S,
     mut message: M,
     keyring: &Keyring,
 ) -> Result<(), Error> {
-    let doc = crate::read_doc(ManyReader::new(signature), iowrap::Ignore::new())?;
+    let doc = crate::read_doc(signature, iowrap::Ignore::new())?;
     if doc.body.is_some() {
         bail!("detached signature was a message");
     }

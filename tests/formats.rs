@@ -6,7 +6,6 @@ use std::io;
 use failure::format_err;
 use failure::Error;
 use gpgrv::Keyring;
-use gpgrv::ManyReader;
 
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
 const INPUT_TXT: &[u8] = include_bytes!("formats/input.txt");
@@ -23,7 +22,7 @@ const INPUT_DAT: &[u8] = include_bytes!("formats/input.dat");
 
 fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     let mut out = Vec::with_capacity(8096);
-    let doc = gpgrv::read_doc(ManyReader::new(file), &mut out).unwrap();
+    let doc = gpgrv::read_doc(io::Cursor::new(file), &mut out).unwrap();
 
     // TODO: we currently don't get the same ending new line behaviour for:
     // TODO: * test_dat_inline_armour
@@ -43,7 +42,7 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
 
     if detached {
-        gpgrv::verify_detached(ManyReader::new(io::Cursor::new(file)), expected, &keyring)?;
+        gpgrv::verify_detached(io::Cursor::new(file), expected, &keyring)?;
     } else {
         let body = doc.body.unwrap();
         gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)

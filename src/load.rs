@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
@@ -10,7 +11,6 @@ use failure::ResultExt;
 
 use crate::armour;
 use crate::digestable::Digestable;
-use crate::manyread::ManyReader;
 use crate::packets;
 use crate::packets::Event;
 use crate::packets::Packet;
@@ -31,9 +31,9 @@ pub struct Body {
     pub header: Option<packets::PlainData>,
 }
 
-pub fn read_doc<R: Read, W: Write>(mut from: ManyReader<R>, put_content: W) -> Result<Doc, Error> {
+pub fn read_doc<R: BufRead, W: Write>(mut from: R, put_content: W) -> Result<Doc, Error> {
     let first_byte = {
-        let head = from.fill_at_least(1)?;
+        let head = from.fill_buf()?;
         ensure!(!head.is_empty(), "empty file");
         head[0]
     };

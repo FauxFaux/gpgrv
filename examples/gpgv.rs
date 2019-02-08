@@ -6,12 +6,12 @@ extern crate iowrap;
 extern crate failure;
 
 use std::fs;
+use std::io;
 
 use clap::App;
 use clap::Arg;
 use failure::Error;
 use failure::ResultExt;
-use gpgrv::ManyReader;
 
 fn main() -> Result<(), Error> {
     let matches = App::new("gpgv")
@@ -48,7 +48,7 @@ fn main() -> Result<(), Error> {
 
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_message(
-            ManyReader::new(
+            io::BufReader::new(
                 fs::File::open(file)
                     .with_context(|_| format_err!("opening input file {:?}", file))?,
             ),

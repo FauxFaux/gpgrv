@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io;
-use std::io::Read;
+use std::io::BufRead;
 use std::io::Write;
 
 use base64;
@@ -13,11 +13,11 @@ use failure::ResultExt;
 
 use crate::digestable::Digestable;
 use crate::load;
-use crate::manyread::ManyReader;
 use crate::packets;
 use crate::packets::Event;
 use crate::packets::Packet;
 use crate::packets::SignatureType;
+use crate::short_string::ShortLine;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
@@ -29,15 +29,15 @@ struct Message {
     pub block: Vec<u8>,
 }
 
-pub fn read_armoured_doc<R: Read, W: Write>(
-    mut from: ManyReader<R>,
+pub fn read_armoured_doc<R: BufRead, W: Write>(
+    mut from: R,
     put_content: W,
 ) -> Result<load::Doc, Error> {
-    match String::from_utf8(from.read_until_limit(b'\n', 4096)?)?.trim() {
+    match String::from_utf8(from.read_short_line()?)?.trim() {
         BEGIN_SIGNED_MESSAGE => {
             let msg = parse_armoured_signed_message(from, put_content)?;
 
-            let signatures = read_signatures_only(ManyReader::new(io::Cursor::new(&msg.block)))?;
+            let signatures = read_signatures_only(io::Cursor::new(&msg.block))?;
 
             Ok(load::Doc {
                 body: Some(load::Body {
@@ -51,7 +51,7 @@ pub fn read_armoured_doc<R: Read, W: Write>(
         BEGIN_SIGNATURE => {
             let block = parse_armoured_signature_body(from)?;
 
-            let signatures = read_signatures_only(ManyReader::new(io::Cursor::new(block)))?;
+            let signatures = read_signatures_only(io::Cursor::new(block))?;
 
             Ok(load::Doc {
                 body: None,
@@ -62,8 +62,8 @@ pub fn read_armoured_doc<R: Read, W: Write>(
     }
 }
 
-fn parse_armoured_signed_message<R: Read, W: Write>(
-    mut from: ManyReader<R>,
+fn parse_armoured_signed_message<R: BufRead, W: Write>(
+    mut from: R,
     to: W,
 ) -> Result<Message, Error> {
     let body_headers = take_headers(&mut from)?;
@@ -78,14 +78,12 @@ fn parse_armoured_signed_message<R: Read, W: Write>(
 
     let sig_type = SignatureType::CanonicalisedText;
 
-    canonicalise(&mut from, to, &mut digest)?;
-
-    let escaped_line = String::from_utf8(from.read_until_limit(b'\n', 4096)?)?;
+    let last_line = String::from_utf8(canonicalise(&mut from, to, &mut digest)?)?;
 
     ensure!(
-        escaped_line == BEGIN_SIGNATURE,
-        "invalid escaped line, should be a signature start: {:?}",
-        escaped_line
+        last_line == BEGIN_SIGNATURE,
+        "invalid last line, should be a signature start: {:?}",
+        last_line
     );
 
     let block = parse_armoured_signature_body(from)
@@ -98,97 +96,58 @@ fn parse_armoured_signed_message<R: Read, W: Write>(
     })
 }
 
-fn canonicalise<R: Read, W: Write>(
-    from: &mut ManyReader<R>,
+fn canonicalise<R: BufRead, W: Write>(
+    mut from: R,
     mut to: W,
     digest: &mut Digestable,
-) -> Result<(), Error> {
-    {
-        // first line is escaped? Handle it directly.
-
-        let buf = from.fill_many(2)?;
-        if buf.starts_with(b"- ") {
-            from.consume(b"- ".len());
-        }
-    }
+) -> Result<Vec<u8>, Error> {
+    let mut done_first = false;
 
     loop {
-        // Note: this will fail to trim whitespace if the whitespace doesn't fit in this buffer
-        let buf = from.fill_many(8 * 1024)?;
-        if buf.is_empty() {
-            bail!("unexpected EOF in message body");
+        let line = from.read_line_max(1024 * 1024)?;
+
+        let text;
+        if !line.starts_with(b"-") {
+            text = &line[..];
+        } else if line.starts_with(b"- ") {
+            text = &line[b"- ".len()..];
+        } else if line.starts_with(b"--") {
+            to.write_all(b"\n")?;
+            return Ok(line);
+        } else {
+            bail!("invalid escaping: {:?}", line);
         }
 
-        match memchr::memchr(b'\n', buf) {
-            Some(0) => (),
-            Some(newline) => {
-                let buf = trim_right(&buf[..newline]);
+        println!("{}", String::from_utf8_lossy(&line));
 
-                to.write_all(buf)?;
-                digest.process(buf);
-                from.consume(newline);
-                continue;
-            }
-            None => {
-                to.write_all(buf)?;
-                digest.process(buf);
-                let valid = buf.len();
-                from.consume(valid);
-                continue;
-            }
-        }
-
-        // has at least "\n-"
-        let buf = from.fill_at_least(3)?;
-        assert_eq!(b'\n', buf[0]);
-
-        if buf[1] != b'-' {
-            // if there's no dash, no special processing is necessary
-            // drop the newline and continue
-            from.consume("\n".len());
+        if done_first {
             to.write_all(b"\n")?;
             digest.process(b"\r\n");
-            continue;
         }
 
-        match buf[2] {
-            b'-' => {
-                to.write_all(b"\n")?;
-                // the trailing newline is not part of the message for digest purposes
-                from.consume("\n".len());
-                return Ok(());
-            }
+        let text = trim_end(text);
 
-            b' ' => {
-                // the escape marker is not included, but the newline is
-                to.write_all(b"\n")?;
-                digest.process(b"\r\n");
-                from.consume("\n- ".len());
-            }
+        to.write_all(text)?;
+        digest.process(text);
 
-            other => bail!(
-                "invalid line escaping: {:?} near {:?}",
-                other,
-                String::from_utf8_lossy(buf)
-            ),
-        }
+        done_first = true;
     }
 }
 
-fn parse_armoured_signature_body<R: Read>(mut from: ManyReader<R>) -> Result<Vec<u8>, Error> {
+fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
     let _sig_headers = take_headers(&mut from)?;
 
     let mut signature = String::with_capacity(1024);
 
     loop {
-        let line = String::from_utf8(from.read_until_limit(b'\n', 4096)?)?;
+        let line = String::from_utf8(from.read_short_line()?)?;
         let line = line.trim();
 
         // checksum
         if line.len() == 5 && line.starts_with('=') {
             // TODO: Validate checksum? It's not part of the security model in any way.
 
-            let line = String::from_utf8(from.read_until_limit(b'\n', 4096)?)?;
+            let line = String::from_utf8(from.read_short_line()?)?;
 
             ensure!(
                 END_MESSAGE == line,
@@ -227,10 +186,10 @@ fn read_signatures_only<R: io::Read>(from: R) -> Result<Vec<packets::Signature>,
     Ok(signatures)
 }
 
-fn take_headers<R: Read>(from: &mut ManyReader<R>) -> Result<HashMap<String, String>, Error> {
+fn take_headers<R: BufRead>(mut from: R) -> Result<HashMap<String, String>, Error> {
     let mut headers = HashMap::new();
     loop {
-        let header = String::from_utf8(from.read_until_limit(b'\n', 4096)?)?;
+        let header = String::from_utf8(from.read_short_line()?)?;
         let header = header.trim();
         if header.is_empty() {
             break;
@@ -248,7 +207,7 @@ fn take_headers<R: Read>(from: &mut ManyReader<R>) -> Result<HashMap<String, Str
     Ok(headers)
 }
 
-fn trim_right(buf: &[u8]) -> &[u8] {
+fn trim_end(buf: &[u8]) -> &[u8] {
     for i in (0..buf.len()).rev() {
         if !is_whitespace(buf[i]) {
             return &buf[..=i];
@@ -266,25 +225,25 @@ fn is_whitespace(b: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use byteorder::ByteOrder;
     use byteorder::BE;
 
-    use crate::manyread::ManyReader;
-
     #[test]
     fn canon_one_line() {
-        assert_canon(b"foo\n--", b"foo\n", b"foo")
+        assert_canon(b"foo\n--\n", b"foo\n", b"foo")
     }
 
     #[test]
     fn canon_two_lines() {
-        assert_canon(b"foo\nbar\n--", b"foo\nbar\n", b"foo\r\nbar")
+        assert_canon(b"foo\nbar\n--\n", b"foo\nbar\n", b"foo\r\nbar")
     }
 
     #[test]
     fn canon_escaped() {
         assert_canon(
-            b"foo\nbar\n- --baz\n--",
+            b"foo\nbar\n- --baz\n--\n",
             b"foo\nbar\n--baz\n",
             b"foo\r\nbar\r\n--baz",
         )
@@ -293,7 +252,7 @@ mod tests {
     #[test]
     fn canon_escaped_first_line() {
         assert_canon(
-            b"- --foo\nbar\n- --baz\n--",
+            b"- --foo\nbar\n- --baz\n--\n",
             b"--foo\nbar\n--baz\n",
             b"--foo\r\nbar\r\n--baz",
         )
@@ -301,26 +260,38 @@ mod tests {
 
     #[test]
     fn canon_nul_inside() {
-        assert_canon(b"foo\0bar\n--", b"foo\0bar\n", b"foo\0bar")
+        assert_canon(b"foo\0bar\n--\n", b"foo\0bar\n", b"foo\0bar")
     }
 
     #[test]
     fn canon_nul_trailing() {
-        assert_canon(b"foo\0\n--", b"foo\n", b"foo")
+        assert_canon(b"foo\0\n--\n", b"foo\n", b"foo")
     }
 
     fn assert_canon(input: &[u8], wanted_output: &[u8], wanted_digested: &[u8]) {
         let mut actual_output = Vec::with_capacity(input.len() * 2);
         let mut digest = crate::Digestable::sha1();
-        super::canonicalise(&mut ManyReader::new(input), &mut actual_output, &mut digest).unwrap();
+        assert_eq!(
+            b"--",
+            super::canonicalise(io::Cursor::new(input), &mut actual_output, &mut digest)
+                .unwrap()
+                .as_slice()
+        );
         let actual_hash = BE::read_u64(&digest.hash());
 
         if wanted_output != actual_output.as_slice() {
             let actual_string = String::from_utf8_lossy(&actual_output);
             let wanted_string = String::from_utf8_lossy(wanted_output);
 
-            assert_eq!(wanted_string, actual_string);
-            assert_eq!(wanted_output, actual_output.as_slice());
+            assert_eq!(
+                wanted_string, actual_string,
+                "wanted output (as string) == actual output"
+            );
+            assert_eq!(
+                wanted_output,
+                actual_output.as_slice(),
+                "wanted output == actual output"
+            );
         }
 
         assert_eq!(sha1(wanted_digested), actual_hash);
