@@ -33,6 +33,7 @@ sha2 = "0.8"
 
 [dev-dependencies]
 clap = "2"
+distro-keyring = "0.1"
 tempfile = "3"
 
 [profile.release]

@@ -118,8 +118,6 @@ fn canonicalise<R: BufRead, W: Write>(
             bail!("invalid escaping: {:?}", line);
         }
 
-        println!("{}", String::from_utf8_lossy(&line));
-
         if done_first {
             to.write_all(b"\n")?;
             digest.process(b"\r\n");
