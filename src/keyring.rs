@@ -1,16 +1,20 @@
 use std::collections::HashSet;
 use std::fmt;
 use std::io;
+use std::io::BufRead;
 use std::io::Read;
 
+use failure::bail;
 use failure::err_msg;
 use failure::format_err;
 use failure::Error;
 use failure::ResultExt;
 use iowrap;
 
+use crate::armour;
 use crate::hash_multimap::HashMultiMap;
 use crate::packets;
+use crate::short_string::ShortLine;
 use crate::PubKey;
 
 #[derive(Clone)]
@@ -27,6 +31,17 @@ impl Keyring {
         Keyring {
             keys: HashMultiMap::new(),
         }
+    }
+
+    pub fn append_keys_from_armoured<R: BufRead>(&mut self, mut reader: R) -> Result<usize, Error> {
+        if String::from_utf8(reader.read_short_line()?)?.trim() != armour::BEGIN_PUBLIC_KEY {
+            bail!("not a public key")
+        }
+
+        self.append_keys_from(io::Cursor::new(armour::unarmour(
+            reader,
+            armour::END_PUBLIC_KEY,
+        )?))
     }
 
     pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize, Error> {
