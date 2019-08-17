@@ -21,6 +21,8 @@ use crate::short_string::ShortLine;
 
 pub const BEGIN_SIGNED_MESSAGE: &str = "-----BEGIN PGP SIGNED MESSAGE-----";
 pub const BEGIN_SIGNATURE: &str = "-----BEGIN PGP SIGNATURE-----";
+pub const BEGIN_PUBLIC_KEY: &str = "-----BEGIN PGP PUBLIC KEY BLOCK-----";
+pub const END_PUBLIC_KEY: &str = "-----END PGP PUBLIC KEY BLOCK-----";
 const END_MESSAGE: &str = "-----END PGP SIGNATURE-----";
 
 struct Message {
@@ -132,11 +134,8 @@ fn canonicalise<R: BufRead, W: Write>(
     }
 }
 
-fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
-    let _sig_headers = take_headers(&mut from)?;
-
-    let mut signature = String::with_capacity(1024);
-
+pub fn unarmour<R: BufRead>(mut from: R, terminator: &str) -> Result<Vec<u8>, Error> {
+    let mut data = String::with_capacity(1024);
     loop {
         let line = String::from_utf8(from.read_short_line()?)?;
         let line = line.trim();
@@ -148,21 +147,25 @@ fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Err
             let line = String::from_utf8(from.read_short_line()?)?;
 
             ensure!(
-                END_MESSAGE == line,
+                terminator == line,
                 "checksum must be immediately followed by end"
             );
             break;
         }
 
-        if END_MESSAGE == line {
+        if terminator == line {
             break;
         }
 
-        signature.push_str(line);
+        data.push_str(line);
     }
 
-    Ok(base64::decode(&signature)
-        .with_context(|_| format_err!("base64 decoding signature: {:?}", signature))?)
+    Ok(base64::decode(&data).with_context(|_| format_err!("base64 decoding: {:?}", data))?)
+}
+
+fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
+    let _sig_headers = take_headers(&mut from)?;
+    unarmour(from, END_MESSAGE)
 }
 
 fn read_signatures_only<R: io::Read>(from: R) -> Result<Vec<packets::Signature>, Error> {
