@@ -176,7 +176,7 @@ where
         };
     }
 
-    let mut from = from.take(len.map(|v| u64::from(v)).unwrap_or(u64::max_value()));
+    let mut from = from.take(len.map(u64::from).unwrap_or(u64::max_value()));
 
     // https://tools.ietf.org/html/rfc4880#section-4.3
     match tag {
@@ -265,7 +265,7 @@ fn parse_signature_packet_v3<R: Read>(mut from: R) -> Result<Signature, Error> {
     let hash_alg = hash_alg(from.read_u8()?)?;
     let hash_hint = from.read_u16::<BigEndian>()?;
 
-    let sig = read_sig(from, &key_alg)?;
+    let sig = read_sig(from, key_alg)?;
 
     Ok(Signature {
         issuer: Some(issuer),
@@ -300,7 +300,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
-    let sig = read_sig(from, &key_alg)?;
+    let sig = read_sig(from, key_alg)?;
 
     Ok(Signature {
         issuer,
@@ -353,8 +353,8 @@ fn hash_alg(code: u8) -> Result<HashAlg, Error> {
     })
 }
 
-fn read_sig<R: Read>(mut from: R, key_alg: &PublicKeyAlg) -> Result<PublicKeySig, Error> {
-    Ok(match *key_alg {
+fn read_sig<R: Read>(mut from: R, key_alg: PublicKeyAlg) -> Result<PublicKeySig, Error> {
+    Ok(match key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
         PublicKeyAlg::Dsa => PublicKeySig::Dsa {
             r: read_mpi(&mut from)?,
