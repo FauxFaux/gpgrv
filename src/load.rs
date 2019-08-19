@@ -71,7 +71,6 @@ fn read_binary_doc<R: Read, W: Write>(from: R, mut put_content: W) -> Result<Doc
                 let mut digest = digestable_for(hash_type)
                     .ok_or_else(|| format_err!("unsupported hash type: {:?}", hash_type))?;
 
-                use packets::SignatureType;
                 match sig_type {
                     SignatureType::Binary => (),
                     other => bail!("unsupported signature type in binary doc: {:?}", other),

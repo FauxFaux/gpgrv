@@ -27,7 +27,7 @@ impl<K: Eq + Hash, V: Eq + Hash> HashMultiMap<K, V> {
         ret
     }
 
-    pub fn entries<'h>(&'h self) -> Box<Iterator<Item = (&'h K, &'h V)> + 'h> {
+    pub fn entries<'h>(&'h self) -> Box<dyn Iterator<Item = (&'h K, &'h V)> + 'h> {
         Box::new(
             self.inner
                 .iter()

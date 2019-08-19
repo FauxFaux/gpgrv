@@ -89,7 +89,7 @@ pub enum Packet {
 
 pub enum Event<'e> {
     Packet(Packet),
-    PlainData(PlainData, &'e mut Read),
+    PlainData(PlainData, &'e mut dyn Read),
 }
 
 impl PubKeyPacket {
@@ -421,7 +421,7 @@ where
         other => bail!("not recognised: {} compression mode", other),
     }
     let mut dec = libflate::deflate::Decoder::new(from);
-    parse_packets(Box::new(&mut dec) as Box<Read>, into)?;
+    parse_packets(Box::new(&mut dec) as Box<dyn Read>, into)?;
     Ok(())
 }
 
