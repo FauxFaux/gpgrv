@@ -1,3 +1,8 @@
+## 0.2.2
+
+ * support for armoured keys (@lutostag)
+
+
 ## 0.2.0
 
  * Unify message formats, and support binary doc

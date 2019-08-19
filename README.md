@@ -69,6 +69,11 @@ and the linking/requirements are complicated.
 
 `rpgp` has too many features, although it does seem to be nicely split into crates.
 
+## Minimum Supported Rust Version (MSRV)
+
+`1.34.2` (Debian Stable 2019) is pinned in Travis. Much older currently works fine,
+but I don't plan to do extra work to make it happen. MSRV bumps are some kind of
+semver bump, to be decided for `1.0.0`.
 
 ## License
 
