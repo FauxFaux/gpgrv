@@ -34,14 +34,21 @@ impl Keyring {
     }
 
     pub fn append_keys_from_armoured<R: BufRead>(&mut self, mut reader: R) -> Result<usize, Error> {
-        if String::from_utf8(reader.read_short_line()?)?.trim() != armour::BEGIN_PUBLIC_KEY {
-            bail!("not a public key")
+        let first_line = reader
+            .read_short_line()
+            .with_context(|_| err_msg("reading first line of key file"))?;
+
+        let as_string = String::from_utf8(first_line)
+            .with_context(|_| err_msg("non-textual data at start of key file"))?;
+
+        if as_string.trim() != armour::BEGIN_PUBLIC_KEY {
+            bail!("not a public key, invalid header: {:?}", as_string);
         }
 
-        self.append_keys_from(io::Cursor::new(armour::unarmour(
-            reader,
-            armour::END_PUBLIC_KEY,
-        )?))
+        let key_data = armour::unarmour(reader, armour::END_PUBLIC_KEY)
+            .with_context(|_| err_msg("unpacking key armour"))?;
+
+        self.append_keys_from(io::Cursor::new(key_data))
     }
 
     pub fn append_keys_from<R: Read>(&mut self, reader: R) -> Result<usize, Error> {
