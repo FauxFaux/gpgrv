@@ -1,6 +1,6 @@
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
-use cast::u32;
+use std::convert::TryFrom;
 
 use crate::rsa;
 use crate::Digestable;
@@ -65,7 +65,7 @@ fn single_signature_valid(
 ) -> Result<(), Vec<SignatureError>> {
     digest.process(&sig.authenticated_data);
 
-    let len = match u32(sig.authenticated_data.len()) {
+    let len = match u32::try_from(sig.authenticated_data.len()) {
         Ok(len) => len,
         Err(_) => return Err(vec![SignatureError::BadData]),
     };
