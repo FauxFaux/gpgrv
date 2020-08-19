@@ -3,11 +3,11 @@ use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
-use failure::bail;
-use failure::ensure;
-use failure::format_err;
-use failure::Error;
-use failure::ResultExt;
+use anyhow::anyhow;
+use anyhow::bail;
+use anyhow::ensure;
+use anyhow::Context;
+use anyhow::Error;
 
 use crate::armour;
 use crate::digestable::Digestable;
@@ -69,7 +69,7 @@ fn read_binary_doc<R: Read, W: Write>(from: R, mut put_content: W) -> Result<Doc
                 };
 
                 let mut digest = digestable_for(hash_type)
-                    .ok_or_else(|| format_err!("unsupported hash type: {:?}", hash_type))?;
+                    .ok_or_else(|| anyhow!("unsupported hash type: {:?}", hash_type))?;
 
                 match sig_type {
                     SignatureType::Binary => (),
@@ -97,7 +97,7 @@ fn read_binary_doc<R: Read, W: Write>(from: R, mut put_content: W) -> Result<Doc
         }
         Ok(())
     })
-    .with_context(|_| format_err!("parsing after at around {}", from.position()))?;
+    .with_context(|| anyhow!("parsing after at around {}", from.position()))?;
 
     Ok(Doc { body, signatures })
 }

@@ -4,11 +4,10 @@ use std::io;
 use std::io::BufRead;
 use std::io::Read;
 
-use failure::bail;
-use failure::err_msg;
-use failure::format_err;
-use failure::Error;
-use failure::ResultExt;
+use anyhow::anyhow;
+use anyhow::bail;
+use anyhow::Context;
+use anyhow::Error;
 use iowrap;
 
 use crate::armour;
@@ -36,17 +35,17 @@ impl Keyring {
     pub fn append_keys_from_armoured<R: BufRead>(&mut self, mut reader: R) -> Result<usize, Error> {
         let first_line = reader
             .read_short_line()
-            .with_context(|_| err_msg("reading first line of key file"))?;
+            .with_context(|| anyhow!("reading first line of key file"))?;
 
         let as_string = String::from_utf8(first_line)
-            .with_context(|_| err_msg("non-textual data at start of key file"))?;
+            .with_context(|| anyhow!("non-textual data at start of key file"))?;
 
         if as_string.trim() != armour::BEGIN_PUBLIC_KEY {
             bail!("not a public key, invalid header: {:?}", as_string);
         }
 
         let key_data = armour::unarmour(reader, armour::END_PUBLIC_KEY)
-            .with_context(|_| err_msg("unpacking key armour"))?;
+            .with_context(|| anyhow!("unpacking key armour"))?;
 
         self.append_keys_from(io::Cursor::new(key_data))
     }
@@ -69,10 +68,10 @@ impl Keyring {
             Event::Packet(Packet::IgnoredJunk)
             | Event::Packet(Packet::Signature(_))
             | Event::Packet(Packet::OnePassHelper(_)) => Ok(()),
-            Event::PlainData(_, _) => Err(err_msg("unsupported: message data in keyring")),
+            Event::PlainData(_, _) => Err(anyhow!("unsupported: message data in keyring")),
         })
-        .with_context(|_| {
-            format_err!(
+        .with_context(|| {
+            anyhow!(
                 "parsing after after {:?} at around {}",
                 last,
                 reader.position()

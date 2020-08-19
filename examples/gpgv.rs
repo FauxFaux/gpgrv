@@ -1,17 +1,11 @@
-extern crate clap;
-extern crate gpgrv;
-extern crate iowrap;
-
-#[macro_use]
-extern crate failure;
-
 use std::fs;
 use std::io;
 
+use anyhow::anyhow;
+use anyhow::Context;
+use anyhow::Error;
 use clap::App;
 use clap::Arg;
-use failure::Error;
-use failure::ResultExt;
 
 fn main() -> Result<(), Error> {
     let matches = App::new("gpgv")
@@ -37,9 +31,9 @@ fn main() -> Result<(), Error> {
     for path in matches.values_of_os("keyring").unwrap() {
         keyring
             .append_keys_from(
-                fs::File::open(path).with_context(|_| format_err!("opening keyring {:?}", path))?,
+                fs::File::open(path).with_context(|| anyhow!("opening keyring {:?}", path))?,
             )
-            .with_context(|_| format!("reading keyring {:?}", path))?;
+            .with_context(|| format!("reading keyring {:?}", path))?;
     }
 
     for &key in keyring.key_ids() {
@@ -49,13 +43,12 @@ fn main() -> Result<(), Error> {
     for file in matches.values_of_os("FILES").unwrap() {
         gpgrv::verify_message(
             io::BufReader::new(
-                fs::File::open(file)
-                    .with_context(|_| format_err!("opening input file {:?}", file))?,
+                fs::File::open(file).with_context(|| anyhow!("opening input file {:?}", file))?,
             ),
             iowrap::Ignore::new(),
             &keyring,
         )
-        .with_context(|_| format_err!("verifying input file {:?}", file))?;
+        .with_context(|| anyhow!("verifying input file {:?}", file))?;
     }
 
     Ok(())

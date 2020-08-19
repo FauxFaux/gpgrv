@@ -1,6 +1,6 @@
 use std::io;
 
-use failure::Error;
+use anyhow::Error;
 
 #[test]
 fn free_bsd() -> Result<(), Error> {

@@ -4,11 +4,10 @@ use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
-use failure::bail;
-use failure::ensure;
-use failure::err_msg;
-use failure::format_err;
-use failure::Error;
+use anyhow::anyhow;
+use anyhow::bail;
+use anyhow::ensure;
+use anyhow::Error;
 
 use crate::keyring::Keyring;
 use crate::packets::SignatureType;
@@ -40,7 +39,7 @@ pub fn verify_message<R: BufRead, W: Write>(
 
     let body = doc
         .body
-        .ok_or_else(|| err_msg("document wasn't a message (i.e. there was no body)"))?;
+        .ok_or_else(|| anyhow!("document wasn't a message (i.e. there was no body)"))?;
 
     let signatures_of_correct_type: Vec<_> = doc
         .signatures
@@ -54,7 +53,7 @@ pub fn verify_message<R: BufRead, W: Write>(
     );
 
     crate::any_signature_valid(keyring, &signatures_of_correct_type, &body.digest)
-        .map_err(|errors| format_err!("no valid signatures: {:?}", errors))
+        .map_err(|errors| anyhow!("no valid signatures: {:?}", errors))
 }
 
 pub fn verify_detached<S: BufRead, M: Read>(
@@ -94,7 +93,7 @@ pub fn verify_detached<S: BufRead, M: Read>(
     }
 
     let mut digest = crate::load::digestable_for(hash_type)
-        .ok_or_else(|| format_err!("unsuported: hash type {:?}", hash_type))?;
+        .ok_or_else(|| anyhow!("unsuported: hash type {:?}", hash_type))?;
 
     let mut buf = [0u8; 8 * 1024];
 
@@ -108,5 +107,5 @@ pub fn verify_detached<S: BufRead, M: Read>(
     }
 
     crate::any_signature_valid(keyring, &signatures, &digest)
-        .map_err(|errors| format_err!("no valid signatures: {:?}", errors))
+        .map_err(|errors| anyhow!("no valid signatures: {:?}", errors))
 }

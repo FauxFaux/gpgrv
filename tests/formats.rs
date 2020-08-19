@@ -1,10 +1,9 @@
-extern crate failure;
 extern crate gpgrv;
 
 use std::io;
 
-use failure::format_err;
-use failure::Error;
+use anyhow::anyhow;
+use anyhow::Error;
 use gpgrv::Keyring;
 
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");
@@ -46,7 +45,7 @@ fn check(expected: &[u8], detached: bool, file: &[u8]) -> Result<(), Error> {
     } else {
         let body = doc.body.unwrap();
         gpgrv::any_signature_valid(&keyring, &doc.signatures, &body.digest)
-            .map_err(|errors| format_err!("no valid signatures: {:?}", errors))?;
+            .map_err(|errors| anyhow!("no valid signatures: {:?}", errors))?;
     }
 
     Ok(())

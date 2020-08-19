@@ -1,7 +1,7 @@
 use std::io::BufRead;
 
-use failure::bail;
-use failure::Error;
+use anyhow::bail;
+use anyhow::Error;
 
 pub trait ShortLine {
     fn read_short_line(&mut self) -> Result<Vec<u8>, Error> {

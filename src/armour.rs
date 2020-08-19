@@ -3,13 +3,12 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
+use anyhow::anyhow;
+use anyhow::bail;
+use anyhow::ensure;
+use anyhow::Context;
+use anyhow::Error;
 use base64;
-use failure::bail;
-use failure::ensure;
-use failure::err_msg;
-use failure::format_err;
-use failure::Error;
-use failure::ResultExt;
 
 use crate::digestable::Digestable;
 use crate::load;
@@ -89,7 +88,7 @@ fn parse_armoured_signed_message<R: BufRead, W: Write>(
     );
 
     let block = parse_armoured_signature_body(from)
-        .with_context(|_| err_msg("reading signature body after message"))?;
+        .with_context(|| anyhow!("reading signature body after message"))?;
 
     Ok(Message {
         digest,
@@ -160,7 +159,7 @@ pub fn unarmour<R: BufRead>(mut from: R, terminator: &str) -> Result<Vec<u8>, Er
         data.push_str(line);
     }
 
-    Ok(base64::decode(&data).with_context(|_| format_err!("base64 decoding: {:?}", data))?)
+    Ok(base64::decode(&data).with_context(|| anyhow!("base64 decoding: {:?}", data))?)
 }
 
 fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
@@ -177,11 +176,8 @@ fn read_signatures_only<R: io::Read>(from: R) -> Result<Vec<packets::Signature>,
             Ok(())
         }
         Event::Packet(Packet::IgnoredJunk) => Ok(()),
-        Event::Packet(other) => Err(format_err!(
-            "unexpected packet in signature block: {:?}",
-            other
-        )),
-        Event::PlainData(_, _) => Err(err_msg("unexpected plain data in signature doc")),
+        Event::Packet(other) => Err(anyhow!("unexpected packet in signature block: {:?}", other)),
+        Event::PlainData(_, _) => Err(anyhow!("unexpected plain data in signature doc")),
     })?;
 
     Ok(signatures)
@@ -199,7 +195,7 @@ fn take_headers<R: BufRead>(mut from: R) -> Result<HashMap<String, String>, Erro
         let (key, colon_value) = header.split_at(
             header
                 .find(": ")
-                .ok_or_else(|| format_err!("header {:?} must contain a colon space", header))?,
+                .ok_or_else(|| anyhow!("header {:?} must contain a colon space", header))?,
         );
 
         headers.insert(key.to_string(), colon_value[2..].to_string());

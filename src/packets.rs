@@ -3,16 +3,16 @@ use std::io::Read;
 use std::u16;
 use std::u32;
 
+use anyhow::bail;
+use anyhow::ensure;
+use anyhow::Context;
+use anyhow::Error;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use cast::u64;
 use cast::usize;
 use digest::Digest;
-use failure::bail;
-use failure::ensure;
-use failure::Error;
-use failure::ResultExt;
 
 use crate::HashAlg;
 use crate::PubKey;
@@ -182,7 +182,7 @@ where
         0 => bail!("reserved tag: 0"),
         1 => bail!("not supported: public key encrypted session key"),
         2 => into(Event::Packet(Packet::Signature(
-            parse_signature_packet(&mut from).with_context(|_| "parsing signature")?,
+            parse_signature_packet(&mut from).with_context(|| "parsing signature")?,
         )))?,
         3 => bail!("not supported: symmetric key encrypted session key"),
         4 => into(Event::Packet(Packet::OnePassHelper(parse_one_pass_helper(
@@ -241,8 +241,8 @@ where
 
 fn parse_signature_packet<R: Read>(mut from: R) -> Result<Signature, Error> {
     Ok(match from.read_u8()? {
-        3 => parse_signature_packet_v3(from).with_context(|_| "v3")?,
-        4 => parse_signature_packet_v4(from).with_context(|_| "v4")?,
+        3 => parse_signature_packet_v3(from).with_context(|| "v3")?,
+        4 => parse_signature_packet_v4(from).with_context(|| "v4")?,
         other => bail!("not supported: unrecognised signature version: {}", other),
     })
 }
@@ -295,7 +295,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
     let bad_subpackets = read_u16_prefixed_data(&mut from)?;
 
     let issuer = find_issuer(&bad_subpackets)
-        .with_context(|_| "reading unsigned subpackets to determine issuer")?;
+        .with_context(|| "reading unsigned subpackets to determine issuer")?;
 
     let hash_hint = from.read_u16::<BigEndian>()?;
 
@@ -653,7 +653,7 @@ mod tests {
     use std::io::Cursor;
     use std::io::Read;
 
-    use failure::Error;
+    use anyhow::Error;
 
     use super::parse_packets;
     use super::Event;
