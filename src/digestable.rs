@@ -1,5 +1,4 @@
-use digest::FixedOutput;
-use digest::Input;
+use digest::Digest;
 
 #[derive(Debug, Clone)]
 pub enum Digestable {
@@ -24,17 +23,17 @@ impl Digestable {
     // Like digest::Input
     pub fn process(&mut self, data: &[u8]) {
         match *self {
-            Digestable::Sha1(ref mut x) => x.input(data),
-            Digestable::Sha256(ref mut x) => x.input(data),
-            Digestable::Sha512(ref mut x) => x.input(data),
+            Digestable::Sha1(ref mut x) => x.update(data),
+            Digestable::Sha256(ref mut x) => x.update(data),
+            Digestable::Sha512(ref mut x) => x.update(data),
         }
     }
 
     pub fn hash(self) -> Vec<u8> {
         match self {
-            Digestable::Sha1(x) => x.fixed_result().to_vec(),
-            Digestable::Sha256(x) => x.fixed_result().to_vec(),
-            Digestable::Sha512(x) => x.fixed_result().to_vec(),
+            Digestable::Sha1(x) => x.finalize().to_vec(),
+            Digestable::Sha256(x) => x.finalize().to_vec(),
+            Digestable::Sha512(x) => x.finalize().to_vec(),
         }
     }
 

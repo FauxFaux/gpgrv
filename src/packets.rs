@@ -9,7 +9,6 @@ use byteorder::ReadBytesExt;
 use cast::u64;
 use cast::usize;
 use digest::Digest;
-use digest::FixedOutput;
 use failure::bail;
 use failure::ensure;
 use failure::Error;
@@ -102,11 +101,11 @@ impl PubKeyPacket {
         // https://tools.ietf.org/html/rfc4880#section-12.2
 
         let mut digest = ::sha1::Sha1::default();
-        digest.input(&[0x99]);
-        digest.input(&to_be_u16(1 + 4 + 1 + len));
-        digest.input(&[self.version]);
-        digest.input(&be_u32(self.creation_time));
-        digest.input(&[alg]);
+        digest.update(&[0x99]);
+        digest.update(&to_be_u16(1 + 4 + 1 + len));
+        digest.update(&[self.version]);
+        digest.update(&be_u32(self.creation_time));
+        digest.update(&[alg]);
         match self.math {
             PubKey::Rsa { ref n, ref e } => {
                 digest_mpi(&mut digest, n);
@@ -116,7 +115,7 @@ impl PubKeyPacket {
         }
 
         let mut ret = [0u8; 20];
-        ret.copy_from_slice(&digest.fixed_result());
+        ret.copy_from_slice(&digest.finalize());
         Some(ret)
     }
 
@@ -614,7 +613,7 @@ fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
 
     if mpi.is_empty() {
         // zero length, no data
-        digest.input(&[0, 0]);
+        digest.update(&[0, 0]);
         return;
     }
 
@@ -624,8 +623,8 @@ fn digest_mpi<D: Digest>(digest: &mut D, mpi: &[u8]) {
     let bits_len = 1 + usize::from(top_bit(first_byte));
     let total_len = bytes_len + bits_len;
 
-    digest.input(&to_be_u16(total_len));
-    digest.input(mpi);
+    digest.update(&to_be_u16(total_len));
+    digest.update(mpi);
 }
 
 fn to_be_u16(val: usize) -> [u8; 2] {
