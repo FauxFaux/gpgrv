@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::io;
 use std::io::Read;
 use std::u16;
@@ -10,8 +11,6 @@ use anyhow::Error;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
-use cast::u64;
-use cast::usize;
 use digest::Digest;
 
 use crate::HashAlg;
@@ -209,10 +208,10 @@ where
         // 16: not defined
         // 17: extended user id (non-textual name information, e.g. image)
         12 | 13 | 17 => {
-            let wanted = u64(match len {
+            let wanted = u64::try_from(match len {
                 Some(len) => len,
                 None => bail!("indeterminate length {} not supported", tag),
-            });
+            })?;
             let found = io::copy(&mut from, &mut iowrap::Ignore::new())?;
             ensure!(
                 found == wanted,
@@ -288,7 +287,7 @@ fn parse_signature_packet_v4<R: Read>(mut from: R) -> Result<Signature, Error> {
     let hash_alg = hash_alg(authenticated_data[3])?;
 
     let good_subpackets_len = BigEndian::read_u16(&authenticated_data[4..6]);
-    let good_subpackets_end = authenticated_data.len() + usize(good_subpackets_len);
+    let good_subpackets_end = authenticated_data.len() + usize::try_from(good_subpackets_len)?;
     authenticated_data.resize(good_subpackets_end, 0);
     from.read_exact(&mut authenticated_data[6..])?;
 
@@ -488,7 +487,7 @@ fn parse_subpackets(mut data: &[u8]) -> Result<Vec<(u8, &[u8])>, Error> {
         } else {
             assert_eq!(255, data[0]);
             len_len = 5;
-            len = usize(BigEndian::read_u32(&data[1..5]));
+            len = usize::try_from(BigEndian::read_u32(&data[1..5]))?;
         }
 
         ensure!(len != 0, "illegal empty subpacket");
@@ -521,7 +520,7 @@ fn parse_literal_data<R: Read>(mut from: R) -> Result<PlainData, Error> {
     };
 
     let name_len = from.read_u8()?;
-    let mut name = vec![0u8; usize(name_len)];
+    let mut name = vec![0u8; usize::try_from(name_len)?];
     from.read_exact(&mut name)?;
     let mtime = from.read_u32::<BigEndian>()?;
     Ok(PlainData {
@@ -557,7 +556,7 @@ fn parse_one_pass_helper<R: Read>(mut from: R) -> Result<OnePassHelper, Error> {
 
 fn read_u16_prefixed_data<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let len = from.read_u16::<BigEndian>()?;
-    let mut data = vec![0u8; usize(len)];
+    let mut data = vec![0u8; usize::try_from(len)?];
     from.read_exact(&mut data)?;
     Ok(data)
 }
@@ -571,7 +570,7 @@ fn read_mpi<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     }
 
     let bytes = (u32::from(bits) + 7) / 8;
-    let mut data = vec![0u8; usize(bytes)];
+    let mut data = vec![0u8; usize::try_from(bytes)?];
     from.read_exact(&mut data)?;
 
     let first_byte = data[0];
