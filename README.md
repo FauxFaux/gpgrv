@@ -27,6 +27,25 @@ fn main() {
 }
 ```
 
+
+## Warning
+
+This library does *not* care about expiry relative to system time.
+
+If you want to handle expiry, you must do so yourself.
+
+Yes, this is a very dangerous decision for cryptograaphy code.
+
+The intended usage for this code, working with
+real-world-computer-generated GPG signatures, is an unusual area of 
+security in that many users will not care about expiry, or will be
+interested in validating against alternative clocks or time windows.
+
+The author does not want to facilitate or encourage this, but respect
+that it is the decision for many users, including the system the author
+is integrating against.
+
+
 ## Supports
 
  * Verifying signatures:
