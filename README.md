@@ -71,7 +71,7 @@ and the linking/requirements are complicated.
 
 ## Minimum Supported Rust Version (MSRV)
 
-`1.36.0` (Jul 2019) (required by `generic-array`) is pinned in Travis.
+`1.48.0` (Nov 2020) is pinned in GitHub Actions.
 MSRV bumps are some kind of semver bump, to be decided for `1.0.0`.
 
 ## License
