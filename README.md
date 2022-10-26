@@ -69,10 +69,16 @@ and the linking/requirements are complicated.
 
 `rpgp` has too many features, although it does seem to be nicely split into crates.
 
+
 ## Minimum Supported Rust Version (MSRV)
 
-`1.48.0` (Nov 2020) is pinned in GitHub Actions.
+This crate is not testing an MSRV at this time, as `clap` (used only in
+examples) is not doing MSRV. If anyone has a usecase, please raise an issue,
+and I'll see if `clap` has improved, or if there's a convenient way to CI
+an older release, without `clap`.
+
 MSRV bumps are some kind of semver bump, to be decided for `1.0.0`.
+
 
 ## License
 
