@@ -19,19 +19,19 @@ repository = "FauxFaux/gpgrv"
 
 [dependencies]
 anyhow = "1"
-base64 = "0.12"
+base64 = "0.13"
 byteorder = "1"
-digest = "0.9"
+digest = "0.10"
 hex = "0.4"
 iowrap = "0.2"
 libflate = "1"
 memchr = "2"
-num = "0.3"
-sha-1 = "0.9"
-sha2 = "0.9"
+num = "0.4"
+sha-1 = "0.10"
+sha2 = "0.10"
 
 [dev-dependencies]
-clap = "2"
+clap = { version = "4", features = ["cargo"] }
 distro-keyring = "0.1"
 tempfile = "3"
 
