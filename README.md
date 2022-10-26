@@ -34,7 +34,7 @@ This library does *not* care about expiry relative to system time.
 
 If you want to handle expiry, you must do so yourself.
 
-Yes, this is a very dangerous decision for cryptograaphy code.
+Yes, this is a very dangerous decision for cryptography code.
 
 The intended usage for this code, working with
 real-world-computer-generated GPG signatures, is an unusual area of 
@@ -81,7 +81,7 @@ is integrating against.
  * [`sequoia-openpgp`](https://crates.io/crates/sequoia-openpgp) (GPLv3) - serious implementation of plenty of `pgp` 
 
 
-I was using the the `gpgme` API, which works, but the API is painful,
+I was using the `gpgme` API, which works, but the API is painful,
 and the linking/requirements are complicated.
 
 `sequoia`'s license is wrong.
@@ -92,7 +92,7 @@ and the linking/requirements are complicated.
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is not testing an MSRV at this time, as `clap` (used only in
-examples) is not doing MSRV. If anyone has a usecase, please raise an issue,
+examples) is not doing MSRV. If anyone has a use-case, please raise an issue,
 and I'll see if `clap` has improved, or if there's a convenient way to CI
 an older release, without `clap`.
 
