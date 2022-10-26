@@ -4,9 +4,15 @@ use anyhow::bail;
 use anyhow::Error;
 
 pub trait ShortLine {
+    /// Read up to a small number of bytes, an EoF, or a '\n' (not platform sensitive), into a Vec.
+    ///
+    /// Never returns a '\n'.
     fn read_short_line(&mut self) -> Result<Vec<u8>, Error> {
         self.read_line_max(4096)
     }
+    /// Read up to `len` bytes, an EoF, or up to a '\n' (not platform sensitive), into a Vec.
+    ///
+    /// Never returns a '\n'.
     fn read_line_max(&mut self, len: usize) -> Result<Vec<u8>, Error>;
 }
 
@@ -18,7 +24,7 @@ impl<B: BufRead> ShortLine for B {
             let buf = self.fill_buf()?;
 
             if buf.is_empty() {
-                bail!("empty read after: {:?}", String::from_utf8_lossy(&line));
+                return Ok(line);
             }
 
             if let Some(excluding_new_line) = memchr::memchr(b'\n', buf) {

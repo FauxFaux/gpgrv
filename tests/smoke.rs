@@ -29,6 +29,18 @@ fn verify() {
 }
 
 #[test]
+fn verify_no_trailing_whitespace() {
+    let mut keyring = gpgrv::Keyring::new();
+    keyring.append_keys_from(io::Cursor::new(FAUX_KEY)).unwrap();
+    gpgrv::verify_message(
+        io::Cursor::new(HELLO_WORLD.trim().as_bytes()),
+        io::Cursor::new(vec![]),
+        &keyring,
+    )
+    .unwrap();
+}
+
+#[test]
 fn verify_with_armoured_pubkey() {
     let mut keyring = gpgrv::Keyring::new();
     keyring
