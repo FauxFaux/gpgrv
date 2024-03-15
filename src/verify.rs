@@ -1,6 +1,3 @@
-use byteorder::BigEndian;
-use byteorder::ByteOrder;
-
 use crate::rsa;
 use crate::Digestable;
 use crate::Keyring;
@@ -73,7 +70,7 @@ fn single_signature_valid(
 
     let hash = digest.clone().hash();
 
-    if sig.hash_hint != BigEndian::read_u16(&hash) {
+    if sig.hash_hint.to_be_bytes() != hash[..2] {
         return Err(vec![SignatureError::HintMismatch]);
     }
 
@@ -84,8 +81,8 @@ fn single_signature_valid(
         _ => return Err(vec![SignatureError::UnsupportedAlgorithm]),
     };
 
-    let keys = keyring.keys_with_id(BigEndian::read_u64(
-        &sig.issuer.ok_or_else(|| vec![SignatureError::NoIssuer])?,
+    let keys = keyring.keys_with_id(u64::from_be_bytes(
+        sig.issuer.ok_or_else(|| vec![SignatureError::NoIssuer])?,
     ));
 
     if keys.is_empty() {
@@ -126,6 +123,6 @@ fn make_tail(len: u32) -> [u8; 6] {
     let mut tail = [0u8; 6];
     tail[0] = 0x04;
     tail[1] = 0xff;
-    BigEndian::write_u32(&mut tail[2..], len);
+    tail[2..].copy_from_slice(&len.to_be_bytes());
     tail
 }
