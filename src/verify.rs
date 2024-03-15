@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 

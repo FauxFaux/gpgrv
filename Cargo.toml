@@ -19,7 +19,7 @@ repository = "FauxFaux/gpgrv"
 
 [dependencies]
 anyhow = "1"
-base64 = "0.13"
+base64 = "0.22"
 byteorder = "1"
 digest = "0.10"
 hex = "0.4"

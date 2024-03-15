@@ -8,7 +8,6 @@ use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Error;
-use iowrap;
 
 use crate::armour;
 use crate::hash_multimap::HashMultiMap;

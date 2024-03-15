@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::io;
 use std::io::Read;
 use std::u16;

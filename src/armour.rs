@@ -3,12 +3,8 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use anyhow::anyhow;
-use anyhow::bail;
-use anyhow::ensure;
-use anyhow::Context;
-use anyhow::Error;
-use base64;
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use base64::Engine;
 
 use crate::digestable::Digestable;
 use crate::load;
@@ -159,7 +155,9 @@ pub fn unarmour<R: BufRead>(mut from: R, terminator: &str) -> Result<Vec<u8>, Er
         data.push_str(line);
     }
 
-    Ok(base64::decode(&data).with_context(|| anyhow!("base64 decoding: {:?}", data))?)
+    Ok(base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .with_context(|| anyhow!("base64 decoding: {:?}", data))?)
 }
 
 fn parse_armoured_signature_body<R: BufRead>(mut from: R) -> Result<Vec<u8>, Error> {
