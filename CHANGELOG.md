@@ -1,3 +1,21 @@
+## 0.4.1
+
+ * add parse (but not verify) support for newer key formats
+ * dep bumps
+
+
+## 0.4.0
+
+ * fix handling of trailing whitespace
+ * new edition; no more msrv due to e.g. clap
+ * bump deps
+
+
+## 0.3.0
+
+ * switch to `anyhow` for errors, raising msrv
+
+
 ## 0.2.2
 
  * support for armoured keys (@lutostag)
