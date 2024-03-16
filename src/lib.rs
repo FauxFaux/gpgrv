@@ -23,6 +23,8 @@ pub use crate::verify::is_any_signature_valid;
 pub enum PublicKeySig {
     Rsa(Vec<u8>),
     Dsa { r: Vec<u8>, s: Vec<u8> },
+    Ecdsa { r: Vec<u8>, s: Vec<u8> },
+    EdDsaLegacy { r: Vec<u8>, s: Vec<u8> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -38,6 +40,11 @@ pub enum PubKey {
     Ed25519 {
         oid: Vec<u8>,
         point: Vec<u8>,
+    },
+    Ecdh {
+        oid: Vec<u8>,
+        point: Vec<u8>,
+        kdf: Vec<u8>,
     },
     Elgaml {
         p: Vec<u8>,

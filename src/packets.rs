@@ -20,6 +20,8 @@ use crate::PublicKeySig;
 enum PublicKeyAlg {
     Rsa,
     Dsa,
+    Ecdsa,
+    EdDsaLegacy,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -155,13 +157,27 @@ where
     let tag;
     let len;
 
+    // https://www.ietf.org/archive/id/draft-ietf-openpgp-crypto-refresh-13.html#name-packet-headers
     if is_bit_set(val, 6) {
-        // new format
-        //        tag = val & 0b0011_1111;
-
-        bail!("not supported: new format");
+        // "openpgp" format
+        tag = val & 0b0011_1111;
+        let b1 = from.read_u8()?;
+        if b1 < 192 {
+            len = Some(u32::from(b1));
+        } else if b1 <= 223 {
+            let b2 = from.read_u8()?;
+            len = Some(((u32::from(b1) - 192) << 8) + u32::from(b2) + 192);
+        } else if b1 == 255 {
+            let b2 = from.read_u8()?;
+            let b3 = from.read_u8()?;
+            let b4 = from.read_u8()?;
+            len = Some(u32::from(b2) << 24 | u32::from(b3) << 16 | u32::from(b4));
+        } else {
+            bail!("unsupported length encoding: {b1}");
+        }
+        println!("new len: {:?}", len);
     } else {
-        // old format
+        // "legacy" format
         tag = (val & 0b0011_1100) >> 2;
         let len_code = val & 0b0000_0011;
         len = match len_code {
@@ -327,11 +343,17 @@ fn sig_type(code: u8) -> Result<SignatureType, Error> {
     })
 }
 
-// https://tools.ietf.org/html/rfc4880#section-9.1
+// https://www.ietf.org/archive/id/draft-ietf-openpgp-crypto-refresh-13.html#name-public-key-algorithms
 fn key_alg(code: u8) -> Result<PublicKeyAlg, Error> {
     Ok(match code {
         1 | 3 => PublicKeyAlg::Rsa,
+        2 => bail!("not supported: key algorithm: rsa encrypt-only"),
+        16 => bail!("not supported: key algorithm: elgamal"),
         17 => PublicKeyAlg::Dsa,
+        18 => bail!("not supported: key algorithm: ecdh public key"),
+        19 => PublicKeyAlg::Ecdsa,
+        20 | 21 => bail!("not supported: key algorithm: [reserved]"),
+        22 => PublicKeyAlg::EdDsaLegacy,
         other => bail!("not supported: key algorithm: {}", other),
     })
 }
@@ -354,6 +376,14 @@ fn read_sig<R: Read>(mut from: R, key_alg: PublicKeyAlg) -> Result<PublicKeySig,
     Ok(match key_alg {
         PublicKeyAlg::Rsa => PublicKeySig::Rsa(read_mpi(&mut from)?),
         PublicKeyAlg::Dsa => PublicKeySig::Dsa {
+            r: read_mpi(&mut from)?,
+            s: read_mpi(&mut from)?,
+        },
+        PublicKeyAlg::Ecdsa => PublicKeySig::Ecdsa {
+            r: read_mpi(&mut from)?,
+            s: read_mpi(&mut from)?,
+        },
+        PublicKeyAlg::EdDsaLegacy => PublicKeySig::EdDsaLegacy {
             r: read_mpi(&mut from)?,
             s: read_mpi(&mut from)?,
         },
@@ -385,6 +415,12 @@ fn parse_pubkey_packet<R: Read>(mut from: R) -> Result<PubKeyPacket, Error> {
             q: read_mpi(&mut from)?,
             g: read_mpi(&mut from)?,
             y: read_mpi(&mut from)?,
+        },
+        18 => PubKey::Ecdh {
+            oid: read_oid(&mut from)?,
+            point: read_mpi(&mut from)?,
+            // not an oid, but same format
+            kdf: read_oid(&mut from)?,
         },
         19 => PubKey::Ecdsa {
             oid: read_oid(&mut from)?,
@@ -425,10 +461,7 @@ where
 // https://tools.ietf.org/html/rfc6637#section-9
 fn read_oid<R: Read>(mut from: R) -> Result<Vec<u8>, Error> {
     let oid_len = from.read_u8()?;
-    ensure!(
-        0 != oid_len && 0xff != oid_len,
-        "reserved ecdsa oid lengths"
-    );
+    ensure!(0 != oid_len && 0xff != oid_len, "reserved oid lengths");
     let mut oid = vec![0u8; usize::from(oid_len)];
     from.read_exact(&mut oid)?;
     Ok(oid)

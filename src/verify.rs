@@ -111,9 +111,10 @@ fn single_signature_key_valid(
             PublicKeySig::Rsa(ref sig) => rsa::verify(sig, (n, e), padded_hash),
             _ => Err(SignatureError::KeySignatureIncompatible),
         },
-        PubKey::Ecdsa { .. } => Err(SignatureError::UnsupportedAlgorithm),
-        PubKey::Ed25519 { .. } => Err(SignatureError::UnsupportedAlgorithm),
-        PubKey::Dsa { .. } => Err(SignatureError::UnsupportedAlgorithm),
+        PubKey::Ecdsa { .. }
+        | PubKey::Ed25519 { .. }
+        | PubKey::Dsa { .. }
+        | PubKey::Ecdh { .. } => Err(SignatureError::UnsupportedAlgorithm),
         // Elgaml doesn't support signing
         PubKey::Elgaml { .. } => Err(SignatureError::BadData),
     }
