@@ -1,9 +1,9 @@
 use std::io;
 
-use anyhow::Error;
+use anyhow::Result;
 
 #[test]
-fn free_bsd() -> Result<(), Error> {
+fn free_bsd() -> Result<()> {
     let mut keyring = gpgrv::Keyring::new();
     keyring.append_keys_from(io::Cursor::new(distro_keyring::supported_debian_keys()))?;
 
@@ -15,5 +15,14 @@ fn free_bsd() -> Result<(), Error> {
     )
     .unwrap();
 
+    Ok(())
+}
+
+#[test]
+fn debian_2023() -> Result<()> {
+    let mut keyring = gpgrv::Keyring::new();
+    keyring.append_keys_from(io::Cursor::new(include_bytes!(
+        "deb/2023.09.24/keyring.gpg"
+    )))?;
     Ok(())
 }
