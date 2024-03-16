@@ -7,7 +7,7 @@ use anyhow::bail;
 use anyhow::ensure;
 use anyhow::Context;
 use anyhow::Error;
-use byteorder::{BigEndian, LittleEndian};
+use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use digest::Digest;
