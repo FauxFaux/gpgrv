@@ -32,7 +32,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 clap = { version = "4", features = ["cargo"] }
-distro-keyring = "0.1"
+distro-keyring = "0.3"
 tempfile = "3"
 
 [profile.release]

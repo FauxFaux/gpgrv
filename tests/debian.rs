@@ -9,7 +9,7 @@ fn free_bsd() -> Result<()> {
 
     let mut out = Vec::new();
     gpgrv::verify_message(
-        io::Cursor::new(&include_bytes!("deb/jessie-kfreebsd/InRelease")[..]),
+        io::Cursor::new(&include_bytes!("deb/example-InRelease")[..]),
         &mut out,
         &keyring,
     )
