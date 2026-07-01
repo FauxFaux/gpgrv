@@ -21,14 +21,14 @@ repository = "FauxFaux/gpgrv"
 anyhow = "1"
 base64 = "0.22"
 byteorder = "1"
-digest = "0.10"
+digest = "0.11"
 hex = "0.4"
 iowrap = "0.2"
 libflate = "2"
 memchr = "2"
 num = "0.4"
-sha-1 = "0.10"
-sha2 = "0.10"
+sha1 = "0.11"
+sha2 = "0.11"
 
 [dev-dependencies]
 clap = { version = "4", features = ["cargo"] }
