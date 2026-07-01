@@ -1,5 +1,3 @@
-extern crate gpgrv;
-
 use std::io;
 
 const FAUX_KEY: &[u8] = include_bytes!("faux.pubkey");

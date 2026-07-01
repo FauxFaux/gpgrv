@@ -1,5 +1,3 @@
-extern crate gpgrv;
-
 use std::io;
 
 use anyhow::Error;
