@@ -3,10 +3,10 @@ use std::io::Read;
 use std::u16;
 use std::u32;
 
-use anyhow::bail;
-use anyhow::ensure;
 use anyhow::Context;
 use anyhow::Error;
+use anyhow::bail;
+use anyhow::ensure;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
@@ -682,9 +682,9 @@ mod tests {
 
     use anyhow::Error;
 
-    use super::parse_packets;
     use super::Event;
     use super::Packet;
+    use super::parse_packets;
 
     const EMPTY_SIG: &[u8] = include_bytes!("../tests/smoke/empty-message.inline-sig");
     const FAUX_KEY: &[u8] = include_bytes!("../tests/faux.pubkey");

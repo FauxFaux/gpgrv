@@ -1,9 +1,9 @@
-use crate::rsa;
 use crate::Digestable;
 use crate::Keyring;
 use crate::PubKey;
 use crate::PublicKeySig;
 use crate::Signature;
+use crate::rsa;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SignatureError {

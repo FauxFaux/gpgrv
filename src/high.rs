@@ -4,10 +4,10 @@ use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
+use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
-use anyhow::Error;
 
 use crate::keyring::Keyring;
 use crate::packets::SignatureType;

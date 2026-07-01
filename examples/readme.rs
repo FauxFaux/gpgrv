@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, BufReader, Cursor, Seek, SeekFrom};
+use std::io::{BufReader, Cursor, Seek, SeekFrom, stdin, stdout};
 fn main() {
     // load a keyring from some file(s)
     // for example, we use the linux distribution keyring

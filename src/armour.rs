@@ -3,7 +3,7 @@ use std::io;
 use std::io::BufRead;
 use std::io::Write;
 
-use anyhow::{anyhow, bail, ensure, Context, Error};
+use anyhow::{Context, Error, anyhow, bail, ensure};
 use base64::Engine;
 
 use crate::digestable::Digestable;
@@ -222,8 +222,8 @@ fn is_whitespace(b: u8) -> bool {
 mod tests {
     use std::io;
 
-    use byteorder::ByteOrder;
     use byteorder::BE;
+    use byteorder::ByteOrder;
 
     #[test]
     fn canon_one_line() {

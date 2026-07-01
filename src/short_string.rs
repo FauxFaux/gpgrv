@@ -1,7 +1,7 @@
 use std::io::BufRead;
 
-use anyhow::bail;
 use anyhow::Error;
+use anyhow::bail;
 
 pub trait ShortLine {
     /// Read up to a small number of bytes, an EoF, or a '\n' (not platform sensitive), into a Vec.

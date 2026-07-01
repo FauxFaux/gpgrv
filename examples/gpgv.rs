@@ -1,7 +1,7 @@
 use std::fs;
 use std::io;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::{Arg, ArgAction};
 
 fn main() -> Result<()> {

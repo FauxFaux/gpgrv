@@ -4,16 +4,16 @@ use std::io;
 use std::io::BufRead;
 use std::io::Read;
 
-use anyhow::anyhow;
-use anyhow::bail;
 use anyhow::Context;
 use anyhow::Error;
+use anyhow::anyhow;
+use anyhow::bail;
 
+use crate::PubKey;
 use crate::armour;
 use crate::hash_multimap::HashMultiMap;
 use crate::packets;
 use crate::short_string::ShortLine;
-use crate::PubKey;
 
 #[derive(Clone)]
 pub struct Keyring {

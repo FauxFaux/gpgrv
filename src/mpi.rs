@@ -19,8 +19,8 @@ pub fn eq(left: &BigUint, right: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use num::bigint::BigUint;
     use num::Zero;
+    use num::bigint::BigUint;
 
     #[test]
     fn powm() {

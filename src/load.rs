@@ -3,12 +3,13 @@ use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 
+use anyhow::Context;
+use anyhow::Error;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
-use anyhow::Context;
-use anyhow::Error;
 
+use crate::HashAlg;
 use crate::armour;
 use crate::digestable::Digestable;
 use crate::packets;
@@ -16,7 +17,6 @@ use crate::packets::Event;
 use crate::packets::Packet;
 use crate::packets::Signature;
 use crate::packets::SignatureType;
-use crate::HashAlg;
 
 #[derive(Clone, Debug)]
 pub struct Doc {
