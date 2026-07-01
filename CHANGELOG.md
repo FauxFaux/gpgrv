@@ -1,3 +1,9 @@
+## 0.5.0
+
+ * bump deps
+ * edition -> 2024
+
+
 ## 0.4.1
 
  * add parse (but not verify) support for newer key formats
