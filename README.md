@@ -1,7 +1,7 @@
 # gpgrv 
 
 [![](https://img.shields.io/crates/v/gpgrv.svg)](https://crates.io/crates/gpgrv)
-[![](https://travis-ci.org/FauxFaux/gpgrv.svg)](https://travis-ci.org/FauxFaux/gpgrv)
+[![Rust](https://github.com/FauxFaux/gpgrv/actions/workflows/rust.yml/badge.svg)](https://github.com/FauxFaux/gpgrv/actions/workflows/rust.yml)
 
 ![An RV.](gpgrv.jpg)
 
